@@ -14,6 +14,7 @@ struct ResultView: View {
     var onCopy: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @State private var copied = false
 
     private var bgColor: Color {
         colorScheme == .dark
@@ -33,11 +34,16 @@ struct ResultView: View {
                         .scaleEffect(0.6)
                         .frame(width: 16, height: 16)
                 }
-                Button("Copy to Clipboard") {
+                Button(copied ? "Copied ✅" : "Copy to Clipboard") {
                     onCopy()
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                        copied = false
+                    }
                 }
                 .buttonStyle(.bordered)
                 .disabled(state.text.isEmpty)
+                .animation(.easeInOut(duration: 0.15), value: copied)
             }
             .padding(.horizontal, 8)
             .padding(.top, 8)
