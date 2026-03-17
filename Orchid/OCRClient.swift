@@ -12,6 +12,11 @@ private struct StreamChunk: Decodable {
 }
 
 // MARK: - OCR Client
+enum OCRMode {
+    case markdown
+    case plainText
+}
+
 enum OCRClient {
     static var endpoint: URL {
         URL(string: "http://127.0.0.1:\(ServerManager.shared.activePort)/chat/completions")!
@@ -19,25 +24,29 @@ enum OCRClient {
     static var modelName: String {
         ServerManager.shared.activeModelPath
     }
-    static let prompt = """
+
+    static let promptMarkdown = """
         Recognize the text in the image and output in Markdown format. \
         Preserve the original layout (headings/paragraphs/tables/formulas). \
         Do not fabricate content that does not exist in the image.
         """
 
-    /// Streams OCR results for the given image file URL.
-    /// - Parameters:
-    ///   - imageURL: Local file URL to the PNG that was captured.
-    ///   - onChunk: Called on the main actor with each incremental text chunk.
-    ///   - onComplete: Called on the main actor when streaming finishes (with optional error).
+    static let promptPlainText = """
+        Recognize the text in the image and output as plain text only. \
+        Do not use any Markdown, HTML, or other markup. \
+        Preserve the original layout using whitespace and line breaks only. \
+        Do not fabricate content that does not exist in the image.
+        """
+
     static func recognize(
         imageURL: URL,
+        mode: OCRMode = .markdown,
         onChunk: @escaping @MainActor (String) -> Void,
         onComplete: @escaping @MainActor (Error?) -> Void
     ) {
         Task {
             do {
-                try await streamOCR(imageURL: imageURL, onChunk: onChunk)
+                try await streamOCR(imageURL: imageURL, mode: mode, onChunk: onChunk)
                 await MainActor.run { onComplete(nil) }
             } catch {
                 await MainActor.run { onComplete(error) }
@@ -47,6 +56,7 @@ enum OCRClient {
 
     private static func streamOCR(
         imageURL: URL,
+        mode: OCRMode,
         onChunk: @escaping @MainActor (String) -> Void
     ) async throws {
         var request = URLRequest(url: endpoint)
@@ -68,7 +78,7 @@ enum OCRClient {
                         ],
                         [
                             "type": "text",
-                            "text": prompt
+                            "text": mode == .plainText ? promptPlainText : promptMarkdown
                         ]
                     ]
                 ]

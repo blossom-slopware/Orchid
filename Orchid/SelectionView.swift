@@ -19,6 +19,7 @@ class SelectionView: NSView {
     private let handleRadius: CGFloat = 5.0
 
     private var recognizeButton: NSButton?
+    private var recognizePlainButton: NSButton?
 
     // MARK: - Handle Enumeration
     enum HandleIndex: Int {
@@ -42,12 +43,20 @@ class SelectionView: NSView {
 
     // MARK: - Setup
     private func setupRecognizeButton() {
-        let button = NSButton(title: "Recognize", target: self, action: #selector(confirmSelection))
+        let button = NSButton(title: "Recognize", target: self, action: #selector(confirmMarkdown))
         button.bezelStyle = .rounded
         button.isHidden = true
         button.keyEquivalent = ""
         addSubview(button)
         recognizeButton = button
+
+        let plainButton = NSButton(title: "Plain Text", target: self, action: #selector(confirmPlainText))
+        plainButton.bezelStyle = .rounded
+        plainButton.isHidden = true
+        plainButton.keyEquivalent = ""
+        plainButton.toolTip = "Model may still output Markdown — plain text output is best-effort only."
+        addSubview(plainButton)
+        recognizePlainButton = plainButton
     }
 
     // MARK: - Drawing
@@ -201,26 +210,41 @@ class SelectionView: NSView {
 
     // MARK: - Recognize Button
     private func updateRecognizeButton() {
-        guard let btn = recognizeButton else { return }
+        guard let btn = recognizeButton, let plainBtn = recognizePlainButton else { return }
         if selectionRect.width > 20 && selectionRect.height > 20 {
             let btnSize = btn.fittingSize
+            let plainSize = plainBtn.fittingSize
+            let gap: CGFloat = 6
+            let totalWidth = btnSize.width + gap + plainSize.width
+            let bottomY = selectionRect.minY - btnSize.height - 4
+
+            // Right-align the pair to the right edge of the selection
+            let rightEdge = selectionRect.maxX
             btn.frame = CGRect(
-                x: selectionRect.maxX - btnSize.width - 4,
-                y: selectionRect.minY - btnSize.height - 4,
+                x: rightEdge - totalWidth,
+                y: bottomY,
                 width: btnSize.width,
                 height: btnSize.height
             )
+            plainBtn.frame = CGRect(
+                x: rightEdge - plainSize.width,
+                y: bottomY,
+                width: plainSize.width,
+                height: plainSize.height
+            )
             btn.isHidden = false
+            plainBtn.isHidden = false
         } else {
             btn.isHidden = true
+            plainBtn.isHidden = true
         }
     }
 
     // MARK: - Keyboard
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 49, 36: // Space, Return → confirm
-            confirmSelection()
+        case 49, 36: // Space, Return → confirm (markdown, default)
+            confirmSelection(mode: .markdown)
         case 53:     // Escape → cancel (fallback, normally routed via cancelOperation)
             cancelCapture()
         default:
@@ -239,7 +263,10 @@ class SelectionView: NSView {
     }
 
     // MARK: - Confirm
-    @objc func confirmSelection() {
+    @objc func confirmMarkdown() { confirmSelection(mode: .markdown) }
+    @objc func confirmPlainText() { confirmSelection(mode: .plainText) }
+
+    func confirmSelection(mode: OCRMode) {
         guard selectionRect.width > 2 && selectionRect.height > 2 else { return }
 
         let captureRect = selectionRect
@@ -249,11 +276,11 @@ class SelectionView: NSView {
         onConfirm?()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            self.performCapture(rect: captureRect)
+            self.performCapture(rect: captureRect, mode: mode)
         }
     }
 
-    private func performCapture(rect: CGRect) {
+    private func performCapture(rect: CGRect, mode: OCRMode) {
         guard let screen = NSScreen.main else { return }
         let screenHeight = screen.frame.height
         let scale = screen.backingScaleFactor
@@ -310,7 +337,7 @@ class SelectionView: NSView {
         print("Orchid: saved capture to \(fileURL.path)")
 
         DispatchQueue.main.async {
-            ResultPanelController.shared.show(imageURL: fileURL)
+            ResultPanelController.shared.show(imageURL: fileURL, mode: mode)
         }
     }
 }

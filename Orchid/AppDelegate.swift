@@ -34,7 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         registerF4HotKey()
 
         // Request Screen Recording permission silently on launch (no overlay)
-        requestScreenCapturePermission {}
+        CGRequestScreenCaptureAccess()
 
         // Subscribe to server state changes to refresh menu
         serverStateCancellable = ServerManager.shared.$serverState
@@ -58,35 +58,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UnregisterEventHotKey(ref)
         }
         ServerManager.shared.stop()
-    }
-
-    // MARK: - Screen Recording Permission
-
-    private func requestScreenCapturePermission(completion: @escaping () -> Void) {
-        if CGPreflightScreenCaptureAccess() {
-            completion()
-            return
-        }
-
-        let granted = CGRequestScreenCaptureAccess()
-        if granted {
-            completion()
-        } else {
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = "需要屏幕录制权限"
-                alert.informativeText = "Orchid 需要「屏幕录制」权限才能截取屏幕内容。\n请前往：系统设置 → 隐私与安全性 → 屏幕录制，勾选 Orchid 后重新启动应用。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "打开系统设置")
-                alert.addButton(withTitle: "稍后")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertFirstButtonReturn {
-                    NSWorkspace.shared.open(
-                        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-                    )
-                }
-            }
-        }
     }
 
     // MARK: - Status Button (left = menu)
@@ -155,8 +126,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func showOverlay() {
-        guard CGPreflightScreenCaptureAccess() else {
-            requestScreenCapturePermission {}
+        if !CGPreflightScreenCaptureAccess() {
+            CGRequestScreenCaptureAccess()
+            // If still denied after requesting, system won't prompt again — guide user to Settings.
+            if !CGPreflightScreenCaptureAccess() {
+                let alert = NSAlert()
+                alert.messageText = "需要屏幕录制权限"
+                alert.informativeText = "请前往：系统设置 → 隐私与安全性 → 屏幕录制，勾选 Orchid 后重新启动应用。"
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "打开系统设置")
+                alert.addButton(withTitle: "稍后")
+                NSApp.activate(ignoringOtherApps: true)
+                if alert.runModal() == .alertFirstButtonReturn {
+                    NSWorkspace.shared.open(
+                        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+                    )
+                }
+            }
             return
         }
 

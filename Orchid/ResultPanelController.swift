@@ -85,7 +85,7 @@ final class ResultPanelController: NSObject {
 
     private override init() {}
 
-    func show(imageURL: URL) {
+    func show(imageURL: URL, mode: OCRMode = .markdown) {
         // Reset existing state in-place so the already-bound SwiftUI view picks up the changes
         ocrState.text = ""
         ocrState.errorMessage = nil
@@ -99,6 +99,7 @@ final class ResultPanelController: NSObject {
         // Start OCR streaming
         OCRClient.recognize(
             imageURL: imageURL,
+            mode: mode,
             onChunk: { [weak self] chunk in
                 self?.ocrState.text += chunk
             },
