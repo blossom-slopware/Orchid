@@ -21,6 +21,10 @@ class SelectionView: NSView {
     private var recognizeButton: NSButton?
     private var recognizePlainButton: NSButton?
 
+    // Custom tooltip (NSTooltipManager doesn't work in .screenSaver level windows)
+    private var tooltipLabel: NSTextField?
+    private var tooltipTrackingArea: NSTrackingArea?
+
     // MARK: - Handle Enumeration
     enum HandleIndex: Int {
         case topLeft = 0, topCenter, topRight
@@ -57,6 +61,20 @@ class SelectionView: NSView {
         plainButton.toolTip = "Model may still output Markdown — plain text output is best-effort only."
         addSubview(plainButton)
         recognizePlainButton = plainButton
+
+        // Custom tooltip label (system tooltips don't work in .screenSaver level windows)
+        let label = NSTextField(labelWithString: "Output may still contain Markdown — best-effort only")
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = NSColor(white: 0.95, alpha: 1)
+        label.backgroundColor = NSColor(white: 0.15, alpha: 0.9)
+        label.isBezeled = false
+        label.drawsBackground = true
+        label.isHidden = true
+        label.wantsLayer = true
+        label.layer?.cornerRadius = 4
+        label.layer?.masksToBounds = true
+        addSubview(label)
+        tooltipLabel = label
     }
 
     // MARK: - Drawing
@@ -234,10 +252,40 @@ class SelectionView: NSView {
             )
             btn.isHidden = false
             plainBtn.isHidden = false
+
+            // Update tracking area for custom tooltip
+            if let old = tooltipTrackingArea { removeTrackingArea(old) }
+            let ta = NSTrackingArea(
+                rect: plainBtn.frame,
+                options: [.mouseEnteredAndExited, .activeAlways],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(ta)
+            tooltipTrackingArea = ta
         } else {
             btn.isHidden = true
             plainBtn.isHidden = true
+            tooltipLabel?.isHidden = true
+            if let old = tooltipTrackingArea { removeTrackingArea(old); tooltipTrackingArea = nil }
         }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard let plainBtn = recognizePlainButton, let label = tooltipLabel else { return }
+        label.sizeToFit()
+        var f = label.frame
+        f.size.width += 8
+        // Position above the Plain Text button
+        f.origin = CGPoint(x: plainBtn.frame.minX, y: plainBtn.frame.maxY + 4)
+        // Keep within view bounds
+        if f.maxX > bounds.maxX { f.origin.x = bounds.maxX - f.width }
+        label.frame = f
+        label.isHidden = false
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        tooltipLabel?.isHidden = true
     }
 
     // MARK: - Keyboard
