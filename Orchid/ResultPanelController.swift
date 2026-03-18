@@ -39,33 +39,58 @@ final class SearchState: ObservableObject {
 
     func next() { if !matches.isEmpty { focusedMatch = (focusedMatch + 1) % matches.count } }
     func prev() { if !matches.isEmpty { focusedMatch = (focusedMatch - 1 + matches.count) % matches.count } }
+
+    /// Returns the 0-based line index of the currently focused match within `text`.
+    func focusedLine(in text: String) -> Int? {
+        guard !matches.isEmpty else { return nil }
+        let matchStart = matches[focusedMatch].lowerBound
+        return text[..<matchStart].components(separatedBy: "\n").count - 1
+    }
 }
 
 // MARK: - Highlighted Text
-/// Renders OCR text with search matches highlighted via AttributedString.
+/// Renders OCR text split by lines, each line tagged with .id("line-N") for ScrollViewReader.
 struct HighlightedText: View {
     let text: String
     @ObservedObject var search: SearchState
 
-    private var highlightColor: Color { Color(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255).opacity(0.45) }
-    private var focusColor: Color    { Color(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255).opacity(0.9) }
-
     var body: some View {
-        Text(attributed)
-            .font(.system(.body, design: .monospaced))
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var attributed: AttributedString {
-        var result = AttributedString(text)
-        guard search.isVisible && !search.query.isEmpty else { return result }
-        for (i, range) in search.matches.enumerated() {
-            if let attrRange = Range(range, in: result) {
-                result[attrRange].backgroundColor = i == search.focusedMatch ? UIColorBridge.focus : UIColorBridge.highlight
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(attributedLines.enumerated()), id: \.offset) { i, attrLine in
+                Text(attrLine)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id("line-\(i)")
             }
         }
-        return result
+    }
+
+    /// Builds per-line AttributedStrings with highlights applied.
+    private var attributedLines: [AttributedString] {
+        // 1. Build the fully-highlighted AttributedString for the whole text.
+        var full = AttributedString(text)
+        if search.isVisible && !search.query.isEmpty {
+            for (i, range) in search.matches.enumerated() {
+                if let attrRange = Range(range, in: full) {
+                    full[attrRange].backgroundColor =
+                        i == search.focusedMatch ? UIColorBridge.focus : UIColorBridge.highlight
+                }
+            }
+        }
+        // 2. Split into lines by walking String indices (preserves empty lines).
+        var lines: [AttributedString] = []
+        var idx = text.startIndex
+        while idx < text.endIndex {
+            let lineEnd = text[idx...].firstIndex(of: "\n") ?? text.endIndex
+            if let r = Range(idx..<lineEnd, in: full) {
+                lines.append(AttributedString(full[r]))
+            } else {
+                lines.append(AttributedString(String(text[idx..<lineEnd])))
+            }
+            idx = lineEnd < text.endIndex ? text.index(after: lineEnd) : text.endIndex
+        }
+        return lines.isEmpty ? [AttributedString(text)] : lines
     }
 }
 
@@ -278,6 +303,16 @@ struct ResultView: View {
                 }
                 .onChange(of: search.query) { _ in search.update(text: state.text) }
                 .onChange(of: search.caseSensitive) { _ in search.update(text: state.text) }
+                .onChange(of: search.focusedMatch) { _ in
+                    if let line = search.focusedLine(in: state.text) {
+                        withAnimation { proxy.scrollTo("line-\(line)", anchor: .center) }
+                    }
+                }
+                .onChange(of: search.matches) { _ in
+                    if let line = search.focusedLine(in: state.text) {
+                        withAnimation { proxy.scrollTo("line-\(line)", anchor: .center) }
+                    }
+                }
             }
             .padding(.bottom, 8)
         }
