@@ -11,8 +11,11 @@ class SelectionView: NSView {
     private var dragStart: CGPoint = .zero
     private var isDragging: Bool = false
     private var activeHandle: HandleIndex? = nil
+    private var resizeAnchor: CGPoint = .zero   // fixed corner opposite to the dragged handle
     private var isMovingSelection: Bool = false
     private var moveOffset: CGPoint = .zero
+
+    private var mouseMoveTrackingArea: NSTrackingArea?
 
     private let accentColor = NSColor(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255, alpha: 1)
     private let handleSize: CGFloat = 10.0
@@ -145,12 +148,86 @@ class SelectionView: NSView {
         return nil
     }
 
+    // MARK: - Cursor
+    private func cursor(at loc: CGPoint) -> NSCursor {
+        if !selectionRect.isEmpty, let handle = handleAt(point: loc) {
+            switch handle {
+            case .topLeft, .bottomRight:    return arrowCursor(angle: 45)
+            case .topRight, .bottomLeft:    return arrowCursor(angle: -45)
+            case .topCenter, .bottomCenter: return arrowCursor(angle: 0)
+            case .middleLeft, .middleRight: return arrowCursor(angle: 90)
+            }
+        }
+        if selectionRect.contains(loc) { return NSCursor.openHand }
+        return NSCursor.crosshair
+    }
+
+    /// Double-headed arrow cursor at the given angle (degrees, CCW).
+    private func arrowCursor(angle angleDeg: CGFloat) -> NSCursor {
+        let size: CGFloat = 18
+        let image = NSImage(size: CGSize(width: size, height: size), flipped: false) { _ in
+            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
+            ctx.translateBy(x: size / 2, y: size / 2)
+            ctx.rotate(by: angleDeg * .pi / 180)
+
+            let halfShaft: CGFloat = 4.025
+            let headLen:   CGFloat = 3.2
+            let headWidth: CGFloat = 2.8
+
+            func arrowPath() -> NSBezierPath {
+                let p = NSBezierPath()
+                p.move(to:  NSPoint(x: 0,           y: halfShaft + headLen))
+                p.line(to:  NSPoint(x: -headWidth,  y: halfShaft))
+                p.line(to:  NSPoint(x:  headWidth,  y: halfShaft))
+                p.close()
+                p.move(to:  NSPoint(x: 0,  y:  halfShaft))
+                p.line(to:  NSPoint(x: 0,  y: -halfShaft))
+                p.move(to:  NSPoint(x: 0,           y: -(halfShaft + headLen)))
+                p.line(to:  NSPoint(x: -headWidth,  y: -halfShaft))
+                p.line(to:  NSPoint(x:  headWidth,  y: -halfShaft))
+                p.close()
+                return p
+            }
+
+            let path = arrowPath()
+            NSColor.black.setStroke(); NSColor.black.setFill()
+            path.lineWidth = 2.5; path.stroke(); path.fill()
+            NSColor.white.setStroke(); NSColor.white.setFill()
+            path.lineWidth = 1.0; path.stroke(); path.fill()
+            return true
+        }
+        return NSCursor(image: image, hotSpot: NSPoint(x: size / 2, y: size / 2))
+    }
+
+    private func updateTrackingArea() {
+        if let old = mouseMoveTrackingArea { removeTrackingArea(old) }
+        let ta = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .activeAlways],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(ta)
+        mouseMoveTrackingArea = ta
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        updateTrackingArea()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+        cursor(at: loc).set()
+    }
+
     // MARK: - Mouse Events
     override func mouseDown(with event: NSEvent) {
         let loc = convert(event.locationInWindow, from: nil)
 
         if !selectionRect.isEmpty, let handle = handleAt(point: loc) {
             activeHandle = handle
+            resizeAnchor = anchorPoint(for: handle, in: selectionRect)
             isDragging = false
             isMovingSelection = false
         } else if selectionRect.contains(loc) {
@@ -159,6 +236,7 @@ class SelectionView: NSView {
                                  y: loc.y - selectionRect.origin.y)
             activeHandle = nil
             isDragging = false
+            NSCursor.closedHand.set()
         } else {
             // Start new rubber band
             isDragging = true
@@ -166,6 +244,7 @@ class SelectionView: NSView {
             selectionRect = .zero
             activeHandle = nil
             isMovingSelection = false
+            NSCursor.crosshair.set()
         }
     }
 
@@ -181,6 +260,7 @@ class SelectionView: NSView {
             selectionRect = CGRect(x: x, y: y, width: w, height: h)
         } else if let handle = activeHandle {
             resizeSelection(handle: handle, to: loc)
+            cursorForHandle(handle).set()
         } else if isMovingSelection {
             selectionRect.origin = CGPoint(
                 x: loc.x - moveOffset.x,
@@ -198,32 +278,51 @@ class SelectionView: NSView {
         isMovingSelection = false
         updateRecognizeButton()
         needsDisplay = true
+        let loc = convert(event.locationInWindow, from: nil)
+        cursor(at: loc).set()
     }
 
     // MARK: - Resize Logic
-    private func resizeSelection(handle: HandleIndex, to loc: CGPoint) {
-        var r = selectionRect
-        switch handle {
-        case .topLeft:
-            r = CGRect(x: loc.x, y: r.minY, width: r.maxX - loc.x, height: loc.y - r.minY)
-        case .topCenter:
-            r = CGRect(x: r.minX, y: r.minY, width: r.width, height: loc.y - r.minY)
-        case .topRight:
-            r = CGRect(x: r.minX, y: r.minY, width: loc.x - r.minX, height: loc.y - r.minY)
-        case .middleLeft:
-            r = CGRect(x: loc.x, y: r.minY, width: r.maxX - loc.x, height: r.height)
-        case .middleRight:
-            r = CGRect(x: r.minX, y: r.minY, width: loc.x - r.minX, height: r.height)
-        case .bottomLeft:
-            r = CGRect(x: loc.x, y: loc.y, width: r.maxX - loc.x, height: r.maxY - loc.y)
-        case .bottomCenter:
-            r = CGRect(x: r.minX, y: loc.y, width: r.width, height: r.maxY - loc.y)
-        case .bottomRight:
-            r = CGRect(x: r.minX, y: loc.y, width: loc.x - r.minX, height: r.maxY - loc.y)
-        }
 
-        // Normalize (prevent negative sizes from flipping)
-        selectionRect = r.standardized
+    /// Returns the fixed anchor point (opposite corner/edge) for a given handle.
+    private func anchorPoint(for handle: HandleIndex, in r: CGRect) -> CGPoint {
+        switch handle {
+        case .topLeft:     return CGPoint(x: r.maxX, y: r.minY)
+        case .topCenter:   return CGPoint(x: r.midX, y: r.minY)
+        case .topRight:    return CGPoint(x: r.minX, y: r.minY)
+        case .middleLeft:  return CGPoint(x: r.maxX, y: r.midY)
+        case .middleRight: return CGPoint(x: r.minX, y: r.midY)
+        case .bottomLeft:  return CGPoint(x: r.maxX, y: r.maxY)
+        case .bottomCenter:return CGPoint(x: r.midX, y: r.maxY)
+        case .bottomRight: return CGPoint(x: r.minX, y: r.maxY)
+        }
+    }
+
+    private func resizeSelection(handle: HandleIndex, to loc: CGPoint) {
+        let a = resizeAnchor
+        switch handle {
+        // Corner handles: both axes free
+        case .topLeft, .topRight, .bottomLeft, .bottomRight:
+            selectionRect = CGRect(x: min(a.x, loc.x), y: min(a.y, loc.y),
+                                   width: abs(loc.x - a.x), height: abs(loc.y - a.y))
+        // Top/bottom center: only Y axis moves, X stays fixed
+        case .topCenter, .bottomCenter:
+            selectionRect = CGRect(x: selectionRect.minX, y: min(a.y, loc.y),
+                                   width: selectionRect.width, height: abs(loc.y - a.y))
+        // Left/right middle: only X axis moves, Y stays fixed
+        case .middleLeft, .middleRight:
+            selectionRect = CGRect(x: min(a.x, loc.x), y: selectionRect.minY,
+                                   width: abs(loc.x - a.x), height: selectionRect.height)
+        }
+    }
+
+    private func cursorForHandle(_ handle: HandleIndex) -> NSCursor {
+        switch handle {
+        case .topLeft, .bottomRight:    return arrowCursor(angle: 45)
+        case .topRight, .bottomLeft:    return arrowCursor(angle: -45)
+        case .topCenter, .bottomCenter: return arrowCursor(angle: 0)
+        case .middleLeft, .middleRight: return arrowCursor(angle: 90)
+        }
     }
 
     // MARK: - Recognize Button
