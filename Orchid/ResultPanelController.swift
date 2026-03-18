@@ -362,6 +362,7 @@ final class ResultPanelController: NSObject {
         searchState.isVisible = false
         searchState.query = ""
         searchState.matches = []
+        searchState.caseSensitive = false
 
         if panel == nil {
             createPanel()
