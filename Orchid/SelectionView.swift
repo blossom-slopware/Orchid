@@ -159,7 +159,8 @@ class SelectionView: NSView {
             }
         }
         if selectionRect.contains(loc) { return NSCursor.openHand }
-        return NSCursor.crosshair
+        // Outside selection: crosshair only when no selection exists yet, arrow otherwise
+        return selectionRect.isEmpty ? NSCursor.crosshair : NSCursor.arrow
     }
 
     /// Double-headed arrow cursor at the given angle (degrees, CCW).
