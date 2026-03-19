@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 // MARK: - Observable OCR State
 final class OCRState: ObservableObject {
@@ -39,64 +40,124 @@ final class SearchState: ObservableObject {
 
     func next() { if !matches.isEmpty { focusedMatch = (focusedMatch + 1) % matches.count } }
     func prev() { if !matches.isEmpty { focusedMatch = (focusedMatch - 1 + matches.count) % matches.count } }
-
-    /// Returns the 0-based line index of the currently focused match within `text`.
-    func focusedLine(in text: String) -> Int? {
-        guard !matches.isEmpty else { return nil }
-        let matchStart = matches[focusedMatch].lowerBound
-        return text[..<matchStart].components(separatedBy: "\n").count - 1
-    }
 }
 
-// MARK: - Highlighted Text
-/// Renders OCR text split by lines, each line tagged with .id("line-N") for ScrollViewReader.
-struct HighlightedText: View {
-    let text: String
+// MARK: - Highlighted Text View (NSTextView via NSViewRepresentable)
+/// Single NSTextView with full cross-line text selection, search highlighting, and auto-scroll.
+struct HighlightedTextView: NSViewRepresentable {
+    @ObservedObject var state: OCRState
     @ObservedObject var search: SearchState
+    var isDark: Bool
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(attributedLines.enumerated()), id: \.offset) { i, attrLine in
-                Text(attrLine)
-                    .font(.system(.body, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .id("line-\(i)")
-            }
-        }
+    private static let highlightColor = NSColor(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255, alpha: 0.45)
+    private static let focusColor     = NSColor(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255, alpha: 0.9)
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.drawsBackground = true
+        textView.font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        textView.textContainerInset = NSSize(width: 4, height: 4)
+        textView.autoresizingMask = [.width]
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        context.coordinator.scrollView = scrollView
+        return scrollView
     }
 
-    /// Builds per-line AttributedStrings with highlights applied.
-    private var attributedLines: [AttributedString] {
-        // 1. Build the fully-highlighted AttributedString for the whole text.
-        var full = AttributedString(text)
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        let coord = context.coordinator
+        let textView = coord.textView!
+
+        // Update background color
+        let bgColor = isDark
+            ? NSColor(red: 0x2a/255, green: 0x27/255, blue: 0x2e/255, alpha: 1)
+            : NSColor(red: 0xfa/255, green: 0xf2/255, blue: 0xf5/255, alpha: 1)
+        textView.backgroundColor = bgColor
+
+        let text = state.text
+        let textColor: NSColor = .labelColor
+
+        // Rebuild attributed string
+        let attrStr = NSMutableAttributedString(
+            string: text,
+            attributes: [
+                .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: textColor,
+            ]
+        )
+
+        // Apply search highlights
         if search.isVisible && !search.query.isEmpty {
             for (i, range) in search.matches.enumerated() {
-                if let attrRange = Range(range, in: full) {
-                    full[attrRange].backgroundColor =
-                        i == search.focusedMatch ? UIColorBridge.focus : UIColorBridge.highlight
+                let nsRange = NSRange(range, in: text)
+                let color = i == search.focusedMatch ? Self.focusColor : Self.highlightColor
+                attrStr.addAttribute(.backgroundColor, value: color, range: nsRange)
+            }
+        }
+
+        // Only update text storage if content changed (preserves selection when only highlights change)
+        let storage = textView.textStorage!
+        if storage.string != text {
+            let prevSelection = textView.selectedRange()
+            storage.setAttributedString(attrStr)
+            // Restore selection if still valid
+            if prevSelection.location + prevSelection.length <= text.utf16.count {
+                textView.setSelectedRange(prevSelection)
+            }
+            // Auto-scroll to bottom during streaming (no active search)
+            if state.isStreaming && (!search.isVisible || search.query.isEmpty) {
+                textView.scrollToEndOfDocument(nil)
+            }
+        } else {
+            // Same text, just update attributes (highlights changed)
+            storage.beginEditing()
+            storage.setAttributes(attrStr.attributes(at: 0, effectiveRange: nil), range: NSRange(location: 0, length: 0))
+            let fullRange = NSRange(location: 0, length: storage.length)
+            // Reset all background colors first
+            storage.removeAttribute(.backgroundColor, range: fullRange)
+            storage.addAttributes([
+                .font: NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular),
+                .foregroundColor: textColor,
+            ], range: fullRange)
+            // Re-apply highlights
+            if search.isVisible && !search.query.isEmpty {
+                for (i, range) in search.matches.enumerated() {
+                    let nsRange = NSRange(range, in: text)
+                    let color = i == search.focusedMatch ? Self.focusColor : Self.highlightColor
+                    storage.addAttribute(.backgroundColor, value: color, range: nsRange)
                 }
             }
+            storage.endEditing()
         }
-        // 2. Split into lines by walking String indices (preserves empty lines).
-        var lines: [AttributedString] = []
-        var idx = text.startIndex
-        while idx < text.endIndex {
-            let lineEnd = text[idx...].firstIndex(of: "\n") ?? text.endIndex
-            if let r = Range(idx..<lineEnd, in: full) {
-                lines.append(AttributedString(full[r]))
-            } else {
-                lines.append(AttributedString(String(text[idx..<lineEnd])))
-            }
-            idx = lineEnd < text.endIndex ? text.index(after: lineEnd) : text.endIndex
-        }
-        return lines.isEmpty ? [AttributedString(text)] : lines
-    }
-}
 
-private enum UIColorBridge {
-    static let highlight = Color(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255).opacity(0.45)
-    static let focus     = Color(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255).opacity(0.9)
+        // Scroll to focused match
+        if search.isVisible && !search.matches.isEmpty {
+            let focusedRange = NSRange(search.matches[search.focusedMatch], in: text)
+            coord.lastScrolledFocus = search.focusedMatch
+            textView.scrollRangeToVisible(focusedRange)
+        }
+    }
+
+    final class Coordinator {
+        var textView: NSTextView?
+        var scrollView: NSScrollView?
+        var lastScrolledFocus: Int = -1
+    }
 }
 
 // MARK: - Search TextField (NSViewRepresentable)
@@ -273,51 +334,34 @@ struct ResultView: View {
             }
 
             // Text content
-            ScrollViewReader { proxy in
+            if let err = state.errorMessage {
                 ScrollView {
-                    Group {
-                        if let err = state.errorMessage {
-                            Text(err)
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundColor(.red)
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else if state.text.isEmpty {
-                            Text("Waiting for OCR…")
-                                .font(.system(.body, design: .monospaced))
-                                .foregroundColor(.primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            HighlightedText(text: state.text, search: search)
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .id("bottom")
+                    Text(err)
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.red)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                 }
-                .onChange(of: state.text) { newText in
-                    search.update(text: newText)
-                    if !search.isVisible || search.query.isEmpty {
-                        withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
-                    }
+            } else if state.text.isEmpty {
+                ScrollView {
+                    Text("Waiting for OCR…")
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                 }
-                .onChange(of: search.query) { _ in search.update(text: state.text) }
-                .onChange(of: search.caseSensitive) { _ in search.update(text: state.text) }
-                .onChange(of: search.focusedMatch) { _ in
-                    if let line = search.focusedLine(in: state.text) {
-                        withAnimation { proxy.scrollTo("line-\(line)", anchor: .center) }
-                    }
-                }
-                .onChange(of: search.matches) { _ in
-                    if let line = search.focusedLine(in: state.text) {
-                        withAnimation { proxy.scrollTo("line-\(line)", anchor: .center) }
-                    }
-                }
+            } else {
+                HighlightedTextView(state: state, search: search, isDark: colorScheme == .dark)
             }
-            .padding(.bottom, 8)
         }
         .frame(minWidth: 200, minHeight: 100)
         .background(bgColor)
+        .onChange(of: state.text) { _ in search.update(text: state.text) }
+        .onChange(of: search.query) { _ in search.update(text: state.text) }
+        .onChange(of: search.caseSensitive) { _ in search.update(text: state.text) }
         // Cmd+F to open search
         .background(KeyEventInterceptor(onCmdF: {
             search.isVisible = true
