@@ -261,7 +261,7 @@ class SelectionView: NSView {
             selectionRect = CGRect(x: x, y: y, width: w, height: h)
         } else if let handle = activeHandle {
             resizeSelection(handle: handle, to: loc)
-            cursorForHandle(handle).set()
+            cursorForHandle(flippedHandle(for: handle, loc: loc)).set()
         } else if isMovingSelection {
             selectionRect.origin = CGPoint(
                 x: loc.x - moveOffset.x,
@@ -323,6 +323,28 @@ class SelectionView: NSView {
         case .topRight, .bottomLeft:    return arrowCursor(angle: -45)
         case .topCenter, .bottomCenter: return arrowCursor(angle: 0)
         case .middleLeft, .middleRight: return arrowCursor(angle: 90)
+        }
+    }
+
+    /// Given the original handle and the current mouse position, returns the effective handle
+    /// accounting for axis flips when the mouse crosses the anchor point.
+    private func flippedHandle(for handle: HandleIndex, loc: CGPoint) -> HandleIndex {
+        let a = resizeAnchor
+        let mouseRight = loc.x >= a.x
+        let mouseAbove = loc.y >= a.y   // AppKit: Y increases upward
+
+        switch handle {
+        // Corner handles: both axes can flip
+        case .topLeft:     return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
+        case .topRight:    return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
+        case .bottomLeft:  return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
+        case .bottomRight: return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
+        // Top/bottom: only Y flips
+        case .topCenter:    return mouseAbove ? .topCenter    : .bottomCenter
+        case .bottomCenter: return mouseAbove ? .topCenter    : .bottomCenter
+        // Left/right: only X flips
+        case .middleLeft:  return mouseRight ? .middleRight : .middleLeft
+        case .middleRight: return mouseRight ? .middleRight : .middleLeft
         }
     }
 
