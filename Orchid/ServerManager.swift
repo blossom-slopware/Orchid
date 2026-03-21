@@ -14,6 +14,7 @@ final class ServerManager: ObservableObject {
 
     private var process: Process?
     private var pollTask: Task<Void, Never>?
+    private var logHandle: FileHandle?
 
     private init() {}
 
@@ -29,30 +30,19 @@ final class ServerManager: ObservableObject {
         activePort = port
 
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: config.pythonPath)
+        proc.executableURL = URL(fileURLWithPath: config.ocrBinPath)
         proc.arguments = [
-            "-m", "mlx_vlm.server",
-            "--model", modelPath,
+            "--model-dir", modelPath,
             "--host", "127.0.0.1",
             "--port", "\(port)",
         ]
+
         var env = ProcessInfo.processInfo.environment
-        env["HF_ENDPOINT"] = "https://hf-mirror.com"
-        // Prevent the subprocess from triggering TCC prompts by redirecting
-        // Python's user-data paths away from protected directories.
+        env["RUST_LOG"] = "info"
+        proc.environment = env
+
         let orchidDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".orchid").path
-        let hfCacheDir = orchidDir + "/hf-cache"
-        // mlx_vlm's /v1/models endpoint calls huggingface_hub.scan_cache_dir()
-        // which requires the hub subdirectory to exist, otherwise it throws
-        // CacheNotFound and the endpoint returns 500 on every poll.
-        try? FileManager.default.createDirectory(atPath: hfCacheDir + "/hub",
-            withIntermediateDirectories: true)
-        env["HF_HOME"] = hfCacheDir
-        env["HF_HUB_CACHE"] = hfCacheDir + "/hub"
-        env["TRANSFORMERS_CACHE"] = hfCacheDir
-        env["XDG_CACHE_HOME"] = orchidDir + "/cache"
-        proc.environment = env
         proc.currentDirectoryURL = URL(fileURLWithPath: orchidDir)
 
         // Redirect subprocess output to a log file instead of inheriting the
@@ -62,9 +52,10 @@ final class ServerManager: ObservableObject {
             withIntermediateDirectories: true)
         let logPath = logDir + "/server.log"
         FileManager.default.createFile(atPath: logPath, contents: nil)
-        if let logHandle = FileHandle(forWritingAtPath: logPath) {
-            proc.standardOutput = logHandle
-            proc.standardError = logHandle
+        if let handle = FileHandle(forWritingAtPath: logPath) {
+            logHandle = handle
+            proc.standardOutput = handle
+            proc.standardError = handle
         }
 
         proc.terminationHandler = { [weak self] _ in
@@ -140,14 +131,20 @@ final class ServerManager: ObservableObject {
 
     // MARK: - Private helpers
 
+    private struct HealthResponse: Decodable {
+        var status: String
+    }
+
     private func pollUntilReady(port: Int) async {
-        let url = URL(string: "http://127.0.0.1:\(port)/v1/models")!
+        let url = URL(string: "http://127.0.0.1:\(port)/health")!
         let session = URLSession(configuration: .ephemeral)
         let deadline = Date().addingTimeInterval(60)
         while !Task.isCancelled && Date() < deadline {
             do {
-                let (_, response) = try await session.data(from: url)
-                if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
+                let (data, response) = try await session.data(from: url)
+                if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                   let health = try? JSONDecoder().decode(HealthResponse.self, from: data),
+                   health.status == "ok" {
                     await MainActor.run { self.serverState = .running }
                     return
                 }

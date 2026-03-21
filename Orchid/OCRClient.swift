@@ -1,14 +1,9 @@
 import Foundation
 
-// MARK: - SSE Chunk models
-private struct StreamChunk: Decodable {
-    struct Choice: Decodable {
-        struct Delta: Decodable {
-            var content: String?
-        }
-        var delta: Delta
-    }
-    var choices: [Choice]
+// MARK: - SSE message models
+private struct StreamMessage: Decodable {
+    var delta: String?
+    var done: Bool?
 }
 
 // MARK: - OCR Client
@@ -19,10 +14,7 @@ enum OCRMode {
 
 enum OCRClient {
     static var endpoint: URL {
-        URL(string: "http://127.0.0.1:\(ServerManager.shared.activePort)/chat/completions")!
-    }
-    static var modelName: String {
-        ServerManager.shared.activeModelPath
+        URL(string: "http://127.0.0.1:\(ServerManager.shared.activePort)/ocr/stream")!
     }
 
     static let promptMarkdown = """
@@ -68,26 +60,15 @@ enum OCRClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
+        let promptText = mode == .plainText ? promptPlainText : promptMarkdown
         let body: [String: Any] = [
-            "model": modelName,
-            "stream": true,
+            "image": [
+                "type": "url",
+                "url": "file://\(imageURL.path)"
+            ],
+            "prompt": promptText,
             "max_tokens": 4096,
             "temperature": 0.01,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": [
-                        [
-                            "type": "image_url",
-                            "image_url": ["url": imageURL.path]
-                        ],
-                        [
-                            "type": "text",
-                            "text": mode == .plainText ? promptPlainText : promptMarkdown
-                        ]
-                    ]
-                ]
-            ]
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -102,15 +83,16 @@ enum OCRClient {
         for try await line in stream.lines {
             guard line.hasPrefix("data: ") else { continue }
             let payload = String(line.dropFirst(6))
-            if payload.trimmingCharacters(in: .whitespaces) == "[DONE]" { break }
 
             guard let data = payload.data(using: .utf8),
-                  let chunk = try? JSONDecoder().decode(StreamChunk.self, from: data),
-                  let text = chunk.choices.first?.delta.content,
-                  !text.isEmpty
+                  let msg = try? JSONDecoder().decode(StreamMessage.self, from: data)
             else { continue }
 
-            await MainActor.run { onChunk(text) }
+            if msg.done == true { break }
+
+            if let text = msg.delta, !text.isEmpty {
+                await MainActor.run { onChunk(text) }
+            }
         }
     }
 }

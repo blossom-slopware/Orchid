@@ -7,7 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var overlayWindowController: OverlayWindowController?
     private var hotKeyRef: EventHotKeyRef?
     private var config: OrchidConfig = OrchidConfig(
-        pythonPath: "",
+        ocrBinPath: "",
         preferredPort: 14416,
         models: []
     )

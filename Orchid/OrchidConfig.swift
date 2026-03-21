@@ -2,7 +2,7 @@ import Foundation
 import TOMLKit
 
 struct OrchidConfig {
-    var pythonPath: String
+    var ocrBinPath: String
     var preferredPort: Int
     var models: [(key: String, path: String)]
 
@@ -20,8 +20,8 @@ struct OrchidConfig {
         let contents = try! String(contentsOf: file, encoding: .utf8)
         let table = try! TOMLTable(string: contents)
 
-        let pythonPath = table["mlx-vlm-python"]?.string
-            ?? "\(home)/.orchid/.venv/bin/python"
+        let ocrBinPath = table["ocr-bin-path"]?.string
+            ?? "\(home)/.orchid/bin/glm-ocr-server"
         let preferredPort = table["port"]?.int ?? 14416
 
         var models: [(key: String, path: String)] = []
@@ -36,17 +36,16 @@ struct OrchidConfig {
         if models.isEmpty {
             models = [
                 (key: "glm-ocr", path: "\(home)/.orchid/models/GLM-OCR-bf16"),
-                (key: "paddle-ocr", path: "\(home)/.orchid/models/PaddleOCR-VL-1.5-bf16"),
             ]
         }
 
-        return OrchidConfig(pythonPath: pythonPath, preferredPort: preferredPort, models: models)
+        return OrchidConfig(ocrBinPath: ocrBinPath, preferredPort: preferredPort, models: models)
     }
 
     static func applyDefaults(to url: URL) {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
 
-        var existingPython: String? = nil
+        var existingBinPath: String? = nil
         var existingPort: Int? = nil
         var existingModels: [String: String] = [:]
         let fileExists = FileManager.default.fileExists(atPath: url.path)
@@ -54,7 +53,7 @@ struct OrchidConfig {
         if fileExists {
             let contents = try! String(contentsOf: url, encoding: .utf8)
             let table = try! TOMLTable(string: contents)
-            existingPython = table["mlx-vlm-python"]?.string
+            existingBinPath = table["ocr-bin-path"]?.string
             existingPort = table["port"]?.int
             if let mt = table["model-path"]?.table {
                 for (k, v) in mt {
@@ -64,17 +63,15 @@ struct OrchidConfig {
         }
 
         let needsGlm = existingModels["glm-ocr"] == nil
-        let needsPaddle = existingModels["paddle-ocr"] == nil
-        let needsWrite = !fileExists || existingPython == nil || existingPort == nil || needsGlm || needsPaddle
+        let needsWrite = !fileExists || existingBinPath == nil || existingPort == nil || needsGlm
 
         guard needsWrite else { return }
 
-        let finalPython = existingPython ?? "\(home)/.orchid/.venv/bin/python"
+        let finalBinPath = existingBinPath ?? "\(home)/.orchid/bin/glm-ocr-server"
         let finalPort = existingPort ?? 14416
         if needsGlm { existingModels["glm-ocr"] = "\(home)/.orchid/models/GLM-OCR-bf16" }
-        if needsPaddle { existingModels["paddle-ocr"] = "\(home)/.orchid/models/PaddleOCR-VL-1.5-bf16" }
 
-        var toml = "mlx-vlm-python = \"\(finalPython)\"\nport = \(finalPort)\n\n[model-path]\n"
+        var toml = "ocr-bin-path = \"\(finalBinPath)\"\nport = \(finalPort)\n\n[model-path]\n"
         for (key, path) in existingModels.sorted(by: { $0.key < $1.key }) {
             toml += "\(key) = \"\(path)\"\n"
         }
@@ -89,7 +86,6 @@ struct OrchidConfig {
     func displayName(for key: String) -> String {
         switch key {
         case "glm-ocr": return "GLM-OCR"
-        case "paddle-ocr": return "PaddleOCR"
         default: return key
         }
     }
