@@ -30,7 +30,7 @@ final class ServerManager: ObservableObject {
         activePort = port
 
         let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: config.ocrBinPath)
+        proc.executableURL = URL(fileURLWithPath: OrchidConfig.bundledServerPath)
         proc.arguments = [
             "--model-dir", modelPath,
             "--host", "127.0.0.1",

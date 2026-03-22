@@ -7,18 +7,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var overlayWindowController: OverlayWindowController?
     private var hotKeyRef: EventHotKeyRef?
     private var config: OrchidConfig = OrchidConfig(
-        ocrBinPath: "",
         preferredPort: 14416,
         models: []
     )
     private var serverStateCancellable: AnyCancellable?
     private var activeModelCancellable: AnyCancellable?
+    private var downloadWindowController: ModelDownloadWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
         // Load config (auto-creates ~/.orchid/config.toml if absent)
         config = OrchidConfig.load()
+
+        // Verify the bundled server binary exists
+        let serverPath = OrchidConfig.bundledServerPath
+        guard FileManager.default.fileExists(atPath: serverPath) else {
+            let alert = NSAlert()
+            alert.messageText = "安装损坏"
+            alert.informativeText = "找不到推理服务器二进制文件，请重新安装 Orchid。\n(\(serverPath))"
+            alert.alertStyle = .critical
+            alert.addButton(withTitle: "退出")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
 
         // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -49,8 +63,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 _ = self
             }
 
-        // Start the inference server
-        ServerManager.shared.start(model: config.defaultModel, config: config)
+        checkModelAndStart()
+    }
+
+    // MARK: - Model check + conditional start
+
+    private func checkModelAndStart() {
+        let modelPath = config.modelPath(for: config.defaultModel)
+            ?? (FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".orchid/models/GLM-OCR-bf16").path)
+        let modelDir = URL(fileURLWithPath: modelPath)
+        let weightsFile = modelDir.appendingPathComponent("model.safetensors")
+
+        var needsDownload = true
+        if FileManager.default.fileExists(atPath: weightsFile.path),
+           let attrs = try? FileManager.default.attributesOfItem(atPath: weightsFile.path),
+           let size = attrs[.size] as? Int64,
+           size > 100_000_000 {
+            needsDownload = false
+        }
+
+        if needsDownload {
+            let dlWC = ModelDownloadWindowController()
+            downloadWindowController = dlWC
+            dlWC.onDownloadComplete = { [weak self] in
+                guard let self else { return }
+                self.downloadWindowController = nil
+                ServerManager.shared.start(model: self.config.defaultModel, config: self.config)
+            }
+            dlWC.presentAndStartDownload(modelDir: modelDir)
+        } else {
+            ServerManager.shared.start(model: config.defaultModel, config: config)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

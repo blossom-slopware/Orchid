@@ -1,0 +1,3 @@
+[submodule "ocr-inference"]
+	path = ocr-inference
+	url = ../glm-ocr-rs

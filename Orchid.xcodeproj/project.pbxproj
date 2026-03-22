@@ -18,6 +18,8 @@
 		AA000001000000000000011 /* OrchidIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000011 /* OrchidIcon.swift */; };
 		AA000001000000000000012 /* OrchidConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000012 /* OrchidConfig.swift */; };
 		AA000001000000000000013 /* ServerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000013 /* ServerManager.swift */; };
+		AA000001000000000000020 /* HuggingFaceDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000020 /* HuggingFaceDownloader.swift */; };
+		AA000001000000000000021 /* ModelDownloadWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000021 /* ModelDownloadWindowController.swift */; };
 		AA000001000000000000014 /* TOMLKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000012000000000000001 /* TOMLKit */; };
 		AA000001000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000015 /* Assets.xcassets */; };
 		AA000001000000000000016 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000016 /* AppIcon.icns */; };
@@ -37,6 +39,8 @@
 		AA000002000000000000011 /* OrchidIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrchidIcon.swift; sourceTree = "<group>"; };
 		AA000002000000000000012 /* OrchidConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrchidConfig.swift; sourceTree = "<group>"; };
 		AA000002000000000000013 /* ServerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerManager.swift; sourceTree = "<group>"; };
+		AA000002000000000000020 /* HuggingFaceDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceDownloader.swift; sourceTree = "<group>"; };
+		AA000002000000000000021 /* ModelDownloadWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadWindowController.swift; sourceTree = "<group>"; };
 		AA000002000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000002000000000000016 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		AA000003000000000000001 /* Orchid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orchid.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -70,6 +74,8 @@
 				AA000002000000000000011 /* OrchidIcon.swift */,
 				AA000002000000000000012 /* OrchidConfig.swift */,
 				AA000002000000000000013 /* ServerManager.swift */,
+				AA000002000000000000020 /* HuggingFaceDownloader.swift */,
+				AA000002000000000000021 /* ModelDownloadWindowController.swift */,
 				AA000002000000000000015 /* Assets.xcassets */,
 				AA000002000000000000016 /* AppIcon.icns */,
 			);
@@ -179,6 +185,8 @@
 				AA000001000000000000011 /* OrchidIcon.swift in Sources */,
 				AA000001000000000000012 /* OrchidConfig.swift in Sources */,
 				AA000001000000000000013 /* ServerManager.swift in Sources */,
+				AA000001000000000000020 /* HuggingFaceDownloader.swift in Sources */,
+				AA000001000000000000021 /* ModelDownloadWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

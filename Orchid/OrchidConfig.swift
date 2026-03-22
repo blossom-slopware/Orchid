@@ -6,11 +6,15 @@ struct OrchidConfig {
     /// Config entries with keys not in this set are ignored.
     static let supportedModelKeys: Set<String> = ["glm-ocr"]
 
-    var ocrBinPath: String
     var preferredPort: Int
     var models: [(key: String, path: String)]
 
     var defaultModel: String { models.first?.key ?? "glm-ocr" }
+
+    /// Path to the glm-ocr-server binary embedded inside the app bundle.
+    static var bundledServerPath: String {
+        Bundle.main.url(forResource: "glm-ocr-server", withExtension: nil, subdirectory: "bin")!.path
+    }
 
     static func load() -> OrchidConfig {
         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -24,8 +28,6 @@ struct OrchidConfig {
         let contents = try! String(contentsOf: file, encoding: .utf8)
         let table = try! TOMLTable(string: contents)
 
-        let ocrBinPath = table["ocr-bin-path"]?.string
-            ?? "\(home)/.orchid/bin/glm-ocr-server"
         let preferredPort = table["port"]?.int ?? 14416
 
         var models: [(key: String, path: String)] = []
@@ -43,13 +45,12 @@ struct OrchidConfig {
             ]
         }
 
-        return OrchidConfig(ocrBinPath: ocrBinPath, preferredPort: preferredPort, models: models)
+        return OrchidConfig(preferredPort: preferredPort, models: models)
     }
 
     static func applyDefaults(to url: URL) {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
 
-        var existingBinPath: String? = nil
         var existingPort: Int? = nil
         var existingModels: [String: String] = [:]
         let fileExists = FileManager.default.fileExists(atPath: url.path)
@@ -57,7 +58,6 @@ struct OrchidConfig {
         if fileExists {
             let contents = try! String(contentsOf: url, encoding: .utf8)
             let table = try! TOMLTable(string: contents)
-            existingBinPath = table["ocr-bin-path"]?.string
             existingPort = table["port"]?.int
             if let mt = table["model-path"]?.table {
                 for (k, v) in mt {
@@ -67,15 +67,14 @@ struct OrchidConfig {
         }
 
         let needsGlm = existingModels["glm-ocr"] == nil
-        let needsWrite = !fileExists || existingBinPath == nil || existingPort == nil || needsGlm
+        let needsWrite = !fileExists || existingPort == nil || needsGlm
 
         guard needsWrite else { return }
 
-        let finalBinPath = existingBinPath ?? "\(home)/.orchid/bin/glm-ocr-server"
         let finalPort = existingPort ?? 14416
         if needsGlm { existingModels["glm-ocr"] = "\(home)/.orchid/models/GLM-OCR-bf16" }
 
-        var toml = "ocr-bin-path = \"\(finalBinPath)\"\nport = \(finalPort)\n\n[model-path]\n"
+        var toml = "port = \(finalPort)\n\n[model-path]\n"
         for (key, path) in existingModels.sorted(by: { $0.key < $1.key }) {
             toml += "\(key) = \"\(path)\"\n"
         }
