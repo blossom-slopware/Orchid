@@ -63,11 +63,13 @@ jobs:
         id: ocr_commit
         run: echo "hash=$(git rev-parse HEAD:ocr-inference)" >> "$GITHUB_OUTPUT"
 
-      - name: Cache glm-ocr-server binary
+      - name: Cache glm-ocr-server binary and metallib
         id: cache_binary
         uses: actions/cache@v4
         with:
-          path: ocr-inference/glm-ocr-rs/target/release/glm-ocr-server
+          path: |
+            ocr-inference/glm-ocr-rs/target/release/glm-ocr-server
+            ocr-inference/glm-ocr-rs/target/release/mlx.metallib
           key: glm-ocr-server-${{ steps.ocr_commit.outputs.hash }}
 
       - name: Install Rust toolchain
@@ -91,6 +93,10 @@ jobs:
         run: |
           cargo build --release \
             --manifest-path ocr-inference/glm-ocr-rs/Cargo.toml
+
+          # Copy metallib to a stable path for caching
+          METALLIB=$(find ocr-inference/glm-ocr-rs/target/release/build -name "mlx.metallib" -type f | head -1)
+          cp "$METALLIB" ocr-inference/glm-ocr-rs/target/release/mlx.metallib
         env:
           CARGO_INCREMENTAL: "0"
 
@@ -109,16 +115,8 @@ jobs:
           BIN_DIR="$GITHUB_WORKSPACE/build/Release/Orchid.app/Contents/Resources/bin"
           mkdir -p "$BIN_DIR"
           cp ocr-inference/glm-ocr-rs/target/release/glm-ocr-server "$BIN_DIR/"
+          cp ocr-inference/glm-ocr-rs/target/release/mlx.metallib "$BIN_DIR/"
           chmod +x "$BIN_DIR/glm-ocr-server"
-
-          # Find and copy mlx.metallib to bin directory for Metal shader loading
-          METALLIB=$(find ocr-inference/glm-ocr-rs/target/release/build -name "mlx.metallib" -type f | head -1)
-          if [ -z "$METALLIB" ]; then
-            echo "::error::Failed to find mlx.metallib in build artifacts"
-            exit 1
-          fi
-          cp "$METALLIB" "$BIN_DIR/"
-          echo "Embedded: $(basename $METALLIB)"
 
       - name: Ad-hoc sign app bundle
         run: |
