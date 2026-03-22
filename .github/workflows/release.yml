@@ -104,12 +104,21 @@ jobs:
             CONFIGURATION_BUILD_DIR="$GITHUB_WORKSPACE/build/Release" \
             build
 
-      - name: Embed glm-ocr-server into app bundle
+      - name: Embed glm-ocr-server and metallib into app bundle
         run: |
           BIN_DIR="$GITHUB_WORKSPACE/build/Release/Orchid.app/Contents/Resources/bin"
           mkdir -p "$BIN_DIR"
           cp ocr-inference/glm-ocr-rs/target/release/glm-ocr-server "$BIN_DIR/"
           chmod +x "$BIN_DIR/glm-ocr-server"
+
+          # Find and copy mlx.metallib to bin directory for Metal shader loading
+          METALLIB=$(find ocr-inference/glm-ocr-rs/target/release/build -name "mlx.metallib" -type f | head -1)
+          if [ -z "$METALLIB" ]; then
+            echo "::error::Failed to find mlx.metallib in build artifacts"
+            exit 1
+          fi
+          cp "$METALLIB" "$BIN_DIR/"
+          echo "Embedded: $(basename $METALLIB)"
 
       - name: Ad-hoc sign app bundle
         run: |
