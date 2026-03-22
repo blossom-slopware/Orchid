@@ -18,6 +18,43 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Preflight – verify secrets and permissions
+        env:
+          HOMEBREW_REPO_TOKEN: ${{ secrets.HOMEBREW_REPO_TOKEN }}
+        run: |
+          # 1. HOMEBREW_REPO_TOKEN must be set
+          if [ -z "${HOMEBREW_REPO_TOKEN}" ]; then
+            echo "::error::HOMEBREW_REPO_TOKEN secret is not set"
+            exit 1
+          fi
+
+          # 2. Token can authenticate with GitHub API
+          HTTP_CODE=$(curl -s -o /tmp/gh_response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${HOMEBREW_REPO_TOKEN}" \
+            https://api.github.com/user)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::HOMEBREW_REPO_TOKEN failed GitHub auth (HTTP $HTTP_CODE)"
+            cat /tmp/gh_response.json
+            exit 1
+          fi
+          echo "Token authenticated as: $(jq -r .login /tmp/gh_response.json)"
+
+          # 3. Token has push access to the homebrew tap repo
+          HTTP_CODE=$(curl -s -o /tmp/gh_repo.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${HOMEBREW_REPO_TOKEN}" \
+            https://api.github.com/repos/blossom-slopware/homebrew-orchid)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Cannot access blossom-slopware/homebrew-orchid (HTTP $HTTP_CODE)"
+            cat /tmp/gh_repo.json
+            exit 1
+          fi
+          PUSH_PERM=$(jq -r '.permissions.push // false' /tmp/gh_repo.json)
+          if [ "$PUSH_PERM" != "true" ]; then
+            echo "::error::Token does not have push permission on homebrew-orchid (permissions: $(jq -c .permissions /tmp/gh_repo.json))"
+            exit 1
+          fi
+          echo "Push permission on homebrew-orchid: OK"
+
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
