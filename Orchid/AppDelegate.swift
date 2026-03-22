@@ -47,9 +47,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Register F4 global hotkey (keyCode 118)
         registerF4HotKey()
 
-        // Request Screen Recording permission silently on launch (no overlay)
-        CGRequestScreenCaptureAccess()
-
         // Subscribe to server state changes to refresh menu
         serverStateCancellable = ServerManager.shared.$serverState
             .receive(on: DispatchQueue.main)
@@ -83,18 +80,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             needsDownload = false
         }
 
+        ServerManager.shared.onStartupError = { [weak self] log in
+            self?.showServerErrorAlert(log: log)
+        }
+
         if needsDownload {
             let dlWC = ModelDownloadWindowController()
             downloadWindowController = dlWC
             dlWC.onDownloadComplete = { [weak self] in
                 guard let self else { return }
                 self.downloadWindowController = nil
+                CGRequestScreenCaptureAccess()
                 ServerManager.shared.start(model: self.config.defaultModel, config: self.config)
             }
             dlWC.presentAndStartDownload(modelDir: modelDir)
         } else {
+            CGRequestScreenCaptureAccess()
             ServerManager.shared.start(model: config.defaultModel, config: config)
         }
+    }
+
+    private func showServerErrorAlert(log: String) {
+        let alert = NSAlert()
+        alert.messageText = "服务器启动失败"
+        alert.informativeText = log
+            + "\n\n如果问题持续存在，请前往 GitHub 反馈：\nhttps://github.com/blossom-slopware/orchid/issues"
+        alert.alertStyle = .critical
+        alert.addButton(withTitle: "复制错误信息")
+        alert.addButton(withTitle: "关闭")
+        NSApp.activate(ignoringOtherApps: true)
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(log, forType: .string)
+        }
+        NSApp.terminate(nil)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

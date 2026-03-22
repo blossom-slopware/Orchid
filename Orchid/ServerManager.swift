@@ -15,6 +15,9 @@ final class ServerManager: ObservableObject {
     private var process: Process?
     private var pollTask: Task<Void, Never>?
     private var logHandle: FileHandle?
+    private var logPath: String = ""
+
+    var onStartupError: ((String) -> Void)?
 
     private init() {}
 
@@ -50,7 +53,8 @@ final class ServerManager: ObservableObject {
         let logDir = orchidDir + "/logs"
         try? FileManager.default.createDirectory(atPath: logDir,
             withIntermediateDirectories: true)
-        let logPath = logDir + "/server.log"
+        logPath = logDir + "/server.log"
+        let logPath = logPath
         FileManager.default.createFile(atPath: logPath, contents: nil)
         if let handle = FileHandle(forWritingAtPath: logPath) {
             logHandle = handle
@@ -140,6 +144,8 @@ final class ServerManager: ObservableObject {
         let session = URLSession(configuration: .ephemeral)
         let deadline = Date().addingTimeInterval(60)
         while !Task.isCancelled && Date() < deadline {
+            // If the process already exited, no point polling
+            if let p = process, !p.isRunning { break }
             do {
                 let (data, response) = try await session.data(from: url)
                 if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
@@ -153,7 +159,14 @@ final class ServerManager: ObservableObject {
             }
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        // timed out or cancelled – leave state as-is
+        // timed out or cancelled — report startup failure
+        if !Task.isCancelled {
+            let log = (try? String(contentsOfFile: logPath, encoding: .utf8)) ?? "无法读取日志文件"
+            await MainActor.run {
+                self.serverState = .stopped
+                self.onStartupError?(log)
+            }
+        }
     }
 
     private func findAvailablePort(starting port: Int) -> Int {

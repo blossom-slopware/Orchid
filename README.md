@@ -45,15 +45,8 @@ glm-ocr = "/path/to/your/checkpoint"
 
 ## Build from Source
 
-Rust server
-
-```
-cargo build --release
-```
-
-Swift menubar app
-
 ```sh
-cd orchid
-xcodebuild -project Orchid.xcodeproj -scheme Orchid -destination 'platform=macOS,arch=arm64' build
+./scripts/build_release.sh
 ```
+
+Produces `build/Orchid-<VERSION>.zip` containing `Orchid.app` with the Rust inference server and Metal shaders bundled.

@@ -40,6 +40,16 @@ if [[ ! -f "$RUST_BINARY" ]]; then
 fi
 echo "    Binary: $RUST_BINARY ($(du -sh "$RUST_BINARY" | cut -f1))"
 
+# Copy mlx.metallib to a stable path next to the binary
+RUST_TARGET_DIR="$REPO_ROOT/ocr-inference/glm-ocr-rs/target/release"
+METALLIB="$(find "$RUST_TARGET_DIR/build" -name 'mlx.metallib' -type f | head -1)"
+if [[ -z "$METALLIB" ]]; then
+    echo "ERROR: mlx.metallib not found in build artifacts"
+    exit 1
+fi
+cp "$METALLIB" "$RUST_TARGET_DIR/mlx.metallib"
+echo "    Metallib: $RUST_TARGET_DIR/mlx.metallib ($(du -sh "$RUST_TARGET_DIR/mlx.metallib" | cut -f1))"
+
 # ---------------------------------------------------------------------------
 # 2. Build Orchid.app (Xcode, Release)
 # ---------------------------------------------------------------------------
@@ -63,12 +73,13 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Embed glm-ocr-server into the app bundle
+# 3. Embed glm-ocr-server and mlx.metallib into the app bundle
 # ---------------------------------------------------------------------------
 BIN_DIR="$APP_PATH/Contents/Resources/bin"
-echo "--> Embedding glm-ocr-server into bundle"
+echo "--> Embedding glm-ocr-server and mlx.metallib into bundle"
 mkdir -p "$BIN_DIR"
 cp "$RUST_BINARY" "$BIN_DIR/glm-ocr-server"
+cp "$RUST_TARGET_DIR/mlx.metallib" "$BIN_DIR/mlx.metallib"
 chmod +x "$BIN_DIR/glm-ocr-server"
 
 # ---------------------------------------------------------------------------
@@ -96,10 +107,3 @@ echo ""
 echo "Done: $ZIP_PATH"
 echo "Size: $(du -sh "$ZIP_PATH" | cut -f1)"
 echo "SHA256: $SHA256"
-echo ""
-echo "Next steps:"
-echo "  1. Create a GitHub Release tagged v${VERSION}"
-echo "  2. Upload $ZIP_NAME to the release"
-echo "  3. Update homebrew-orchid/Casks/orchid.rb:"
-echo "       version \"${VERSION}\""
-echo "       sha256 \"${SHA256}\""
