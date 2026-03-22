@@ -1,6 +1,6 @@
 <p align="center">
   <br>
-  <img src="orchid.svg" alt="Lockpaw mascot" width="200" />
+  <img src="orchid.svg" alt="Lockpaw mascot" width="96" />
   <br>
 </p>
 
@@ -11,25 +11,49 @@
 </p>
 
 
+## Install
 
-## Build
+### Using Homebrew (Recommended)
 
 ```sh
-cd orchid
-xcodebuild -project Orchid.xcodeproj -scheme Orchid -destination 'platform=macOS,arch=arm64' build
+brew tap blossom-slopware/orchid
+brew install --cask orchid
 ```
+
+To upgrade:
+
+```sh
+brew upgrade --cask blossom-slopware/orchid/orchid
+```
+
+### Manual Installation
+
+Download the latest release from [GitHub Releases](https://github.com/GLM-OCR/orchid/releases) and extract `Orchid.app` to your Applications folder.
 
 
 ## Configure
 
-Configure your python interpreter path and model checkpoint paths in `~/.orchid/config.toml`.
-
+Configure your preferred port and model checkpoint paths in `~/.orchid/config.toml`.
 
 ```toml
-mlx-vlm-python = "/Users/daisy/develop/GLM-OCR/.venv-mlx/bin/python"
 port = 14416
 
 [model-path]
-glm-ocr = "/Users/daisy/develop/GLM-OCR/models/GLM-OCR-bf16"
-paddle-ocr = "/Users/daisy/develop/GLM-OCR/models/PaddleOCR-VL-1.5-bf16"
+glm-ocr = "/path/to/your/checkpoint"
+```
+
+
+## Build from Source
+
+Rust server
+
+```
+cargo build --release
+```
+
+Swift menubar app
+
+```sh
+cd orchid
+xcodebuild -project Orchid.xcodeproj -scheme Orchid -destination 'platform=macOS,arch=arm64' build
 ```
