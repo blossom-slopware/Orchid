@@ -11,13 +11,14 @@ class SelectionView: NSView {
     private var dragStart: CGPoint = .zero
     private var isDragging: Bool = false
     private var activeHandle: HandleIndex? = nil
-    private var resizeAnchor: CGPoint = .zero   // fixed corner opposite to the dragged handle
+    private var resizeAnchor: CGPoint = .zero  // fixed corner opposite to the dragged handle
     private var isMovingSelection: Bool = false
     private var moveOffset: CGPoint = .zero
 
     private var mouseMoveTrackingArea: NSTrackingArea?
 
-    private let accentColor = NSColor(red: 0xed/255, green: 0x8e/255, blue: 0xa9/255, alpha: 1)
+    private let accentColor = NSColor(
+        red: 0xed / 255, green: 0x8e / 255, blue: 0xa9 / 255, alpha: 1)
     private let handleSize: CGFloat = 10.0
     private let handleRadius: CGFloat = 5.0
 
@@ -32,7 +33,8 @@ class SelectionView: NSView {
 
     // MARK: - Handle Enumeration
     enum HandleIndex: Int {
-        case topLeft = 0, topCenter, topRight
+        case topLeft = 0
+        case topCenter, topRight
         case middleLeft, middleRight
         case bottomLeft, bottomCenter, bottomRight
     }
@@ -66,16 +68,19 @@ class SelectionView: NSView {
         container.addSubview(button)
         recognizeButton = button
 
-        let plainButton = NSButton(title: "Plain Text", target: self, action: #selector(confirmPlainText))
+        let plainButton = NSButton(
+            title: "Plain Text", target: self, action: #selector(confirmPlainText))
         plainButton.bezelStyle = .rounded
         plainButton.keyEquivalent = ""
-        plainButton.toolTip = "Model may still output Markdown — plain text output is best-effort only."
+        plainButton.toolTip =
+            "Model may still output Markdown — plain text output is best-effort only."
         styleButton(plainButton)
         container.addSubview(plainButton)
         recognizePlainButton = plainButton
 
         // Custom tooltip label (system tooltips don't work in .screenSaver level windows)
-        let label = NSTextField(labelWithString: "Output may still contain Markdown — best-effort only")
+        let label = NSTextField(
+            labelWithString: "Output may still contain Markdown — best-effort only")
         label.font = .systemFont(ofSize: 11)
         label.textColor = NSColor(white: 0.95, alpha: 1)
         label.backgroundColor = NSColor(white: 0.15, alpha: 0.9)
@@ -154,14 +159,14 @@ class SelectionView: NSView {
     private func allHandles() -> [CGPoint] {
         let r = selectionRect
         return [
-            CGPoint(x: r.minX, y: r.maxY),       // topLeft
-            CGPoint(x: r.midX, y: r.maxY),       // topCenter
-            CGPoint(x: r.maxX, y: r.maxY),       // topRight
-            CGPoint(x: r.minX, y: r.midY),       // middleLeft
-            CGPoint(x: r.maxX, y: r.midY),       // middleRight
-            CGPoint(x: r.minX, y: r.minY),       // bottomLeft
-            CGPoint(x: r.midX, y: r.minY),       // bottomCenter
-            CGPoint(x: r.maxX, y: r.minY),       // bottomRight
+            CGPoint(x: r.minX, y: r.maxY),  // topLeft
+            CGPoint(x: r.midX, y: r.maxY),  // topCenter
+            CGPoint(x: r.maxX, y: r.maxY),  // topRight
+            CGPoint(x: r.minX, y: r.midY),  // middleLeft
+            CGPoint(x: r.maxX, y: r.midY),  // middleRight
+            CGPoint(x: r.minX, y: r.minY),  // bottomLeft
+            CGPoint(x: r.midX, y: r.minY),  // bottomCenter
+            CGPoint(x: r.maxX, y: r.minY),  // bottomRight
         ]
     }
 
@@ -180,8 +185,8 @@ class SelectionView: NSView {
     private func cursor(at loc: CGPoint) -> NSCursor {
         if !selectionRect.isEmpty, let handle = handleAt(point: loc) {
             switch handle {
-            case .topLeft, .bottomRight:    return arrowCursor(angle: 45)
-            case .topRight, .bottomLeft:    return arrowCursor(angle: -45)
+            case .topLeft, .bottomRight: return arrowCursor(angle: 45)
+            case .topRight, .bottomLeft: return arrowCursor(angle: -45)
             case .topCenter, .bottomCenter: return arrowCursor(angle: 0)
             case .middleLeft, .middleRight: return arrowCursor(angle: 90)
             }
@@ -200,29 +205,35 @@ class SelectionView: NSView {
             ctx.rotate(by: angleDeg * .pi / 180)
 
             let halfShaft: CGFloat = 4.025
-            let headLen:   CGFloat = 3.2
+            let headLen: CGFloat = 3.2
             let headWidth: CGFloat = 2.8
 
             func arrowPath() -> NSBezierPath {
                 let p = NSBezierPath()
-                p.move(to:  NSPoint(x: 0,           y: halfShaft + headLen))
-                p.line(to:  NSPoint(x: -headWidth,  y: halfShaft))
-                p.line(to:  NSPoint(x:  headWidth,  y: halfShaft))
+                p.move(to: NSPoint(x: 0, y: halfShaft + headLen))
+                p.line(to: NSPoint(x: -headWidth, y: halfShaft))
+                p.line(to: NSPoint(x: headWidth, y: halfShaft))
                 p.close()
-                p.move(to:  NSPoint(x: 0,  y:  halfShaft))
-                p.line(to:  NSPoint(x: 0,  y: -halfShaft))
-                p.move(to:  NSPoint(x: 0,           y: -(halfShaft + headLen)))
-                p.line(to:  NSPoint(x: -headWidth,  y: -halfShaft))
-                p.line(to:  NSPoint(x:  headWidth,  y: -halfShaft))
+                p.move(to: NSPoint(x: 0, y: halfShaft))
+                p.line(to: NSPoint(x: 0, y: -halfShaft))
+                p.move(to: NSPoint(x: 0, y: -(halfShaft + headLen)))
+                p.line(to: NSPoint(x: -headWidth, y: -halfShaft))
+                p.line(to: NSPoint(x: headWidth, y: -halfShaft))
                 p.close()
                 return p
             }
 
             let path = arrowPath()
-            NSColor.black.setStroke(); NSColor.black.setFill()
-            path.lineWidth = 2.5; path.stroke(); path.fill()
-            NSColor.white.setStroke(); NSColor.white.setFill()
-            path.lineWidth = 1.0; path.stroke(); path.fill()
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+            path.lineWidth = 2.5
+            path.stroke()
+            path.fill()
+            NSColor.white.setStroke()
+            NSColor.white.setFill()
+            path.lineWidth = 1.0
+            path.stroke()
+            path.fill()
             return true
         }
         return NSCursor(image: image, hotSpot: NSPoint(x: size / 2, y: size / 2))
@@ -261,8 +272,9 @@ class SelectionView: NSView {
             isMovingSelection = false
         } else if selectionRect.contains(loc) {
             isMovingSelection = true
-            moveOffset = CGPoint(x: loc.x - selectionRect.origin.x,
-                                 y: loc.y - selectionRect.origin.y)
+            moveOffset = CGPoint(
+                x: loc.x - selectionRect.origin.x,
+                y: loc.y - selectionRect.origin.y)
             activeHandle = nil
             isDragging = false
             NSCursor.closedHand.set()
@@ -318,13 +330,13 @@ class SelectionView: NSView {
     /// Returns the fixed anchor point (opposite corner/edge) for a given handle.
     private func anchorPoint(for handle: HandleIndex, in r: CGRect) -> CGPoint {
         switch handle {
-        case .topLeft:     return CGPoint(x: r.maxX, y: r.minY)
-        case .topCenter:   return CGPoint(x: r.midX, y: r.minY)
-        case .topRight:    return CGPoint(x: r.minX, y: r.minY)
-        case .middleLeft:  return CGPoint(x: r.maxX, y: r.midY)
+        case .topLeft: return CGPoint(x: r.maxX, y: r.minY)
+        case .topCenter: return CGPoint(x: r.midX, y: r.minY)
+        case .topRight: return CGPoint(x: r.minX, y: r.minY)
+        case .middleLeft: return CGPoint(x: r.maxX, y: r.midY)
         case .middleRight: return CGPoint(x: r.minX, y: r.midY)
-        case .bottomLeft:  return CGPoint(x: r.maxX, y: r.maxY)
-        case .bottomCenter:return CGPoint(x: r.midX, y: r.maxY)
+        case .bottomLeft: return CGPoint(x: r.maxX, y: r.maxY)
+        case .bottomCenter: return CGPoint(x: r.midX, y: r.maxY)
         case .bottomRight: return CGPoint(x: r.minX, y: r.maxY)
         }
     }
@@ -334,23 +346,26 @@ class SelectionView: NSView {
         switch handle {
         // Corner handles: both axes free
         case .topLeft, .topRight, .bottomLeft, .bottomRight:
-            selectionRect = CGRect(x: min(a.x, loc.x), y: min(a.y, loc.y),
-                                   width: abs(loc.x - a.x), height: abs(loc.y - a.y))
+            selectionRect = CGRect(
+                x: min(a.x, loc.x), y: min(a.y, loc.y),
+                width: abs(loc.x - a.x), height: abs(loc.y - a.y))
         // Top/bottom center: only Y axis moves, X stays fixed
         case .topCenter, .bottomCenter:
-            selectionRect = CGRect(x: selectionRect.minX, y: min(a.y, loc.y),
-                                   width: selectionRect.width, height: abs(loc.y - a.y))
+            selectionRect = CGRect(
+                x: selectionRect.minX, y: min(a.y, loc.y),
+                width: selectionRect.width, height: abs(loc.y - a.y))
         // Left/right middle: only X axis moves, Y stays fixed
         case .middleLeft, .middleRight:
-            selectionRect = CGRect(x: min(a.x, loc.x), y: selectionRect.minY,
-                                   width: abs(loc.x - a.x), height: selectionRect.height)
+            selectionRect = CGRect(
+                x: min(a.x, loc.x), y: selectionRect.minY,
+                width: abs(loc.x - a.x), height: selectionRect.height)
         }
     }
 
     private func cursorForHandle(_ handle: HandleIndex) -> NSCursor {
         switch handle {
-        case .topLeft, .bottomRight:    return arrowCursor(angle: 45)
-        case .topRight, .bottomLeft:    return arrowCursor(angle: -45)
+        case .topLeft, .bottomRight: return arrowCursor(angle: 45)
+        case .topRight, .bottomLeft: return arrowCursor(angle: -45)
         case .topCenter, .bottomCenter: return arrowCursor(angle: 0)
         case .middleLeft, .middleRight: return arrowCursor(angle: 90)
         }
@@ -361,19 +376,27 @@ class SelectionView: NSView {
     private func flippedHandle(for handle: HandleIndex, loc: CGPoint) -> HandleIndex {
         let a = resizeAnchor
         let mouseRight = loc.x >= a.x
-        let mouseAbove = loc.y >= a.y   // AppKit: Y increases upward
+        let mouseAbove = loc.y >= a.y  // AppKit: Y increases upward
 
         switch handle {
         // Corner handles: both axes can flip
-        case .topLeft:     return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
-        case .topRight:    return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
-        case .bottomLeft:  return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
-        case .bottomRight: return mouseRight ? (mouseAbove ? .topRight    : .bottomRight) : (mouseAbove ? .topLeft    : .bottomLeft)
+        case .topLeft:
+            return mouseRight
+                ? (mouseAbove ? .topRight : .bottomRight) : (mouseAbove ? .topLeft : .bottomLeft)
+        case .topRight:
+            return mouseRight
+                ? (mouseAbove ? .topRight : .bottomRight) : (mouseAbove ? .topLeft : .bottomLeft)
+        case .bottomLeft:
+            return mouseRight
+                ? (mouseAbove ? .topRight : .bottomRight) : (mouseAbove ? .topLeft : .bottomLeft)
+        case .bottomRight:
+            return mouseRight
+                ? (mouseAbove ? .topRight : .bottomRight) : (mouseAbove ? .topLeft : .bottomLeft)
         // Top/bottom: only Y flips
-        case .topCenter:    return mouseAbove ? .topCenter    : .bottomCenter
-        case .bottomCenter: return mouseAbove ? .topCenter    : .bottomCenter
+        case .topCenter: return mouseAbove ? .topCenter : .bottomCenter
+        case .bottomCenter: return mouseAbove ? .topCenter : .bottomCenter
         // Left/right: only X flips
-        case .middleLeft:  return mouseRight ? .middleRight : .middleLeft
+        case .middleLeft: return mouseRight ? .middleRight : .middleLeft
         case .middleRight: return mouseRight ? .middleRight : .middleLeft
         }
     }
@@ -383,7 +406,7 @@ class SelectionView: NSView {
     private func hideButtons() {
         guard let container = buttonContainer else { return }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.1
+            ctx.duration = 0.15
             container.animator().alphaValue = 0
         } completionHandler: {
             if self.isInteracting { container.isHidden = true }
@@ -394,14 +417,15 @@ class SelectionView: NSView {
         guard let container = buttonContainer else { return }
         container.isHidden = false
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.1
+            ctx.duration = 0.15
             container.animator().alphaValue = 1
         }
     }
 
     private func updateRecognizeButton() {
         guard let btn = recognizeButton, let plainBtn = recognizePlainButton,
-              let container = buttonContainer else { return }
+            let container = buttonContainer
+        else { return }
         if isInteracting {
             hideButtons()
             return
@@ -409,10 +433,12 @@ class SelectionView: NSView {
         if selectionRect.width > 20 && selectionRect.height > 20 {
             let hPad: CGFloat = 10
             let vPad: CGFloat = 4
-            let btnSize = CGSize(width: btn.fittingSize.width + hPad * 2,
-                                 height: btn.fittingSize.height + vPad * 2)
-            let plainSize = CGSize(width: plainBtn.fittingSize.width + hPad * 2,
-                                   height: plainBtn.fittingSize.height + vPad * 2)
+            let btnSize = CGSize(
+                width: btn.fittingSize.width + hPad * 2,
+                height: btn.fittingSize.height + vPad * 2)
+            let plainSize = CGSize(
+                width: plainBtn.fittingSize.width + hPad * 2,
+                height: plainBtn.fittingSize.height + vPad * 2)
             let gap: CGFloat = 6
             let totalWidth = btnSize.width + gap + plainSize.width
             let btnHeight = max(btnSize.height, plainSize.height)
@@ -438,8 +464,9 @@ class SelectionView: NSView {
                 height: btnHeight
             )
             btn.frame = CGRect(x: 0, y: 0, width: btnSize.width, height: btnHeight)
-            plainBtn.frame = CGRect(x: btnSize.width + gap, y: 0,
-                                    width: plainSize.width, height: btnHeight)
+            plainBtn.frame = CGRect(
+                x: btnSize.width + gap, y: 0,
+                width: plainSize.width, height: btnHeight)
 
             showButtons()
 
@@ -462,13 +489,17 @@ class SelectionView: NSView {
         } else {
             hideButtons()
             tooltipLabel?.isHidden = true
-            if let old = tooltipTrackingArea { removeTrackingArea(old); tooltipTrackingArea = nil }
+            if let old = tooltipTrackingArea {
+                removeTrackingArea(old)
+                tooltipTrackingArea = nil
+            }
         }
     }
 
     override func mouseEntered(with event: NSEvent) {
         guard let plainBtn = recognizePlainButton, let label = tooltipLabel,
-              let container = buttonContainer else { return }
+            let container = buttonContainer
+        else { return }
         label.sizeToFit()
         var f = label.frame
         f.size.width += 8
@@ -488,9 +519,9 @@ class SelectionView: NSView {
     // MARK: - Keyboard
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
-        case 49, 36: // Space, Return → confirm (markdown, default)
+        case 49, 36:  // Space, Return → confirm (markdown, default)
             confirmSelection(mode: .markdown)
-        case 53:     // Escape → cancel (fallback, normally routed via cancelOperation)
+        case 53:  // Escape → cancel (fallback, normally routed via cancelOperation)
             cancelCapture()
         default:
             super.keyDown(with: event)
@@ -545,12 +576,13 @@ class SelectionView: NSView {
             image = cropped
         } else {
             // Fallback: live capture (overlay is already hidden at this point)
-            image = ScreenCapture.capture(rect: CGRect(
-                x: rect.origin.x,
-                y: screenHeight - rect.maxY,
-                width: rect.width,
-                height: rect.height
-            ))
+            image = ScreenCapture.capture(
+                rect: CGRect(
+                    x: rect.origin.x,
+                    y: screenHeight - rect.maxY,
+                    width: rect.width,
+                    height: rect.height
+                ))
         }
 
         guard let image else {
@@ -562,7 +594,8 @@ class SelectionView: NSView {
         let storageDir = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".orchid/storage")
         do {
-            try FileManager.default.createDirectory(at: storageDir, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: storageDir, withIntermediateDirectories: true)
         } catch {
             print("Orchid: failed to create storage dir: \(error)")
             return

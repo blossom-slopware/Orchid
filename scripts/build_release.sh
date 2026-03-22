@@ -29,11 +29,11 @@ echo "==> Building Orchid $VERSION"
 # ---------------------------------------------------------------------------
 # 1. Build glm-ocr-server (Rust, release)
 # ---------------------------------------------------------------------------
-CARGO_MANIFEST="$REPO_ROOT/ocr-inference/glm-ocr-rs/Cargo.toml"
-echo "--> cargo build --release"
-cargo build --release --manifest-path "$CARGO_MANIFEST"
+CARGO_MANIFEST="$REPO_ROOT/ocr-inference/Cargo.toml"
+echo "--> cargo build --release -p glm-ocr-server"
+cargo build --release --manifest-path "$CARGO_MANIFEST" -p glm-ocr-server
 
-RUST_BINARY="$REPO_ROOT/ocr-inference/glm-ocr-rs/target/release/glm-ocr-server"
+RUST_BINARY="$REPO_ROOT/ocr-inference/target/release/glm-ocr-server"
 if [[ ! -f "$RUST_BINARY" ]]; then
     echo "ERROR: Rust binary not found at $RUST_BINARY"
     exit 1
@@ -41,7 +41,7 @@ fi
 echo "    Binary: $RUST_BINARY ($(du -sh "$RUST_BINARY" | cut -f1))"
 
 # Copy mlx.metallib to a stable path next to the binary
-RUST_TARGET_DIR="$REPO_ROOT/ocr-inference/glm-ocr-rs/target/release"
+RUST_TARGET_DIR="$REPO_ROOT/ocr-inference/target/release"
 METALLIB="$(find "$RUST_TARGET_DIR/build" -name 'mlx.metallib' -type f | head -1)"
 if [[ -z "$METALLIB" ]]; then
     echo "ERROR: mlx.metallib not found in build artifacts"

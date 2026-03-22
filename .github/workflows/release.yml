@@ -68,8 +68,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ocr-inference/glm-ocr-rs/target/release/glm-ocr-server
-            ocr-inference/glm-ocr-rs/target/release/mlx.metallib
+            ocr-inference/target/release/glm-ocr-server
+            ocr-inference/target/release/mlx.metallib
           key: glm-ocr-server-${{ steps.ocr_commit.outputs.hash }}
 
       - name: Install Rust toolchain
@@ -85,18 +85,19 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: cargo-${{ hashFiles('ocr-inference/glm-ocr-rs/Cargo.lock') }}
+          key: cargo-${{ hashFiles('ocr-inference/Cargo.lock') }}
           restore-keys: cargo-
 
       - name: Build glm-ocr-server (release)
         if: steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           cargo build --release \
-            --manifest-path ocr-inference/glm-ocr-rs/Cargo.toml
+            --manifest-path ocr-inference/Cargo.toml \
+            -p glm-ocr-server
 
           # Copy metallib to a stable path for caching
-          METALLIB=$(find ocr-inference/glm-ocr-rs/target/release/build -name "mlx.metallib" -type f | head -1)
-          cp "$METALLIB" ocr-inference/glm-ocr-rs/target/release/mlx.metallib
+          METALLIB=$(find ocr-inference/target/release/build -name "mlx.metallib" -type f | head -1)
+          cp "$METALLIB" ocr-inference/target/release/mlx.metallib
         env:
           CARGO_INCREMENTAL: "0"
 
@@ -114,8 +115,8 @@ jobs:
         run: |
           BIN_DIR="$GITHUB_WORKSPACE/build/Release/Orchid.app/Contents/Resources/bin"
           mkdir -p "$BIN_DIR"
-          cp ocr-inference/glm-ocr-rs/target/release/glm-ocr-server "$BIN_DIR/"
-          cp ocr-inference/glm-ocr-rs/target/release/mlx.metallib "$BIN_DIR/"
+          cp ocr-inference/target/release/glm-ocr-server "$BIN_DIR/"
+          cp ocr-inference/target/release/mlx.metallib "$BIN_DIR/"
           chmod +x "$BIN_DIR/glm-ocr-server"
 
       - name: Ad-hoc sign app bundle
