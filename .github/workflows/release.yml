@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: macos-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ hashFiles('ocr-inference/glm-ocr-rs/Cargo.lock') }}
+          restore-keys: cargo-
+
+      - name: Build glm-ocr-server (release)
+        run: |
+          cargo build --release \
+            --manifest-path ocr-inference/glm-ocr-rs/Cargo.toml
+        env:
+          CARGO_INCREMENTAL: "0"
+
+      - name: Build Orchid.app (Release)
+        run: |
+          xcodebuild \
+            -project Orchid.xcodeproj \
+            -scheme Orchid \
+            -configuration Release \
+            -destination 'platform=macOS,arch=arm64' \
+            CONFIGURATION_BUILD_DIR="$GITHUB_WORKSPACE/build/Release" \
+            build
+
+      - name: Embed glm-ocr-server into app bundle
+        run: |
+          BIN_DIR="$GITHUB_WORKSPACE/build/Release/Orchid.app/Contents/Resources/bin"
+          mkdir -p "$BIN_DIR"
+          cp ocr-inference/glm-ocr-rs/target/release/glm-ocr-server "$BIN_DIR/"
+          chmod +x "$BIN_DIR/glm-ocr-server"
+
+      - name: Ad-hoc sign app bundle
+        run: |
+          codesign --deep --force --sign "-" \
+            "$GITHUB_WORKSPACE/build/Release/Orchid.app"
+
+      - name: Package into zip
+        id: package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          ZIP_NAME="Orchid-${VERSION}.zip"
+          cd "$GITHUB_WORKSPACE/build/Release"
+          zip -qr "$GITHUB_WORKSPACE/build/${ZIP_NAME}" Orchid.app
+          SHA256="$(shasum -a 256 "$GITHUB_WORKSPACE/build/${ZIP_NAME}" | awk '{print $1}')"
+          echo "zip_name=${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$GITHUB_WORKSPACE/build/${ZIP_NAME}" >> "$GITHUB_OUTPUT"
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.zip_path }}
+          generate_release_notes: true
+
+      - name: Update homebrew-orchid cask
+        env:
+          HOMEBREW_REPO_TOKEN: ${{ secrets.HOMEBREW_REPO_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256="${{ steps.package.outputs.sha256 }}"
+
+          git clone \
+            "https://x-access-token:${HOMEBREW_REPO_TOKEN}@github.com/blossom-slopware/homebrew-orchid.git" \
+            /tmp/homebrew-orchid
+
+          cd /tmp/homebrew-orchid
+
+          # Update version and sha256 in orchid.rb
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Casks/orchid.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${SHA256}\"/" Casks/orchid.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/orchid.rb
+          git commit -m "Update orchid to ${VERSION}"
+          git push
