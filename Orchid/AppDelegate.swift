@@ -135,7 +135,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let serverManager = ServerManager.shared
 
         // 截图识别
-        menu.addItem(NSMenuItem(title: "截图识别", action: #selector(showOverlay), keyEquivalent: ""))
+        let ocrItem = NSMenuItem(title: "截图识别", action: #selector(showOverlay), keyEquivalent: "")
+        ocrItem.keyEquivalent = String(UnicodeScalar(NSF4FunctionKey)!)
+        ocrItem.keyEquivalentModifierMask = []
+        menu.addItem(ocrItem)
         menu.addItem(.separator())
 
         // Model submenu

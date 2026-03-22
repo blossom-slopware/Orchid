@@ -23,6 +23,8 @@ class SelectionView: NSView {
 
     private var recognizeButton: NSButton?
     private var recognizePlainButton: NSButton?
+    private var buttonContainer: NSView?
+    private var isInteracting: Bool = false
 
     // Custom tooltip (NSTooltipManager doesn't work in .screenSaver level windows)
     private var tooltipLabel: NSTextField?
@@ -50,19 +52,26 @@ class SelectionView: NSView {
 
     // MARK: - Setup
     private func setupRecognizeButton() {
+        let container = NSView()
+        container.wantsLayer = true
+        container.alphaValue = 0
+        container.isHidden = true
+        addSubview(container)
+        buttonContainer = container
+
         let button = NSButton(title: "Recognize", target: self, action: #selector(confirmMarkdown))
         button.bezelStyle = .rounded
-        button.isHidden = true
         button.keyEquivalent = ""
-        addSubview(button)
+        styleButton(button)
+        container.addSubview(button)
         recognizeButton = button
 
         let plainButton = NSButton(title: "Plain Text", target: self, action: #selector(confirmPlainText))
         plainButton.bezelStyle = .rounded
-        plainButton.isHidden = true
         plainButton.keyEquivalent = ""
         plainButton.toolTip = "Model may still output Markdown — plain text output is best-effort only."
-        addSubview(plainButton)
+        styleButton(plainButton)
+        container.addSubview(plainButton)
         recognizePlainButton = plainButton
 
         // Custom tooltip label (system tooltips don't work in .screenSaver level windows)
@@ -78,6 +87,25 @@ class SelectionView: NSView {
         label.layer?.masksToBounds = true
         addSubview(label)
         tooltipLabel = label
+    }
+
+    private func styleButton(_ btn: NSButton) {
+        btn.wantsLayer = true
+        btn.isBordered = false
+        btn.layer?.backgroundColor = NSColor(white: 0.3, alpha: 0.9).cgColor
+        btn.layer?.cornerRadius = 5
+        btn.contentTintColor = .white
+        btn.font = .systemFont(ofSize: 13)
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        btn.attributedTitle = NSAttributedString(
+            string: btn.title,
+            attributes: [
+                .foregroundColor: NSColor.white,
+                .font: NSFont.systemFont(ofSize: 13),
+                .paragraphStyle: style,
+            ]
+        )
     }
 
     // MARK: - Drawing
@@ -269,7 +297,8 @@ class SelectionView: NSView {
             )
         }
 
-        updateRecognizeButton()
+        isInteracting = true
+        hideButtons()
         needsDisplay = true
     }
 
@@ -277,6 +306,7 @@ class SelectionView: NSView {
         isDragging = false
         activeHandle = nil
         isMovingSelection = false
+        isInteracting = false
         updateRecognizeButton()
         needsDisplay = true
         let loc = convert(event.locationInWindow, from: nil)
@@ -349,36 +379,80 @@ class SelectionView: NSView {
     }
 
     // MARK: - Recognize Button
+
+    private func hideButtons() {
+        guard let container = buttonContainer else { return }
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.1
+            container.animator().alphaValue = 0
+        } completionHandler: {
+            if self.isInteracting { container.isHidden = true }
+        }
+    }
+
+    private func showButtons() {
+        guard let container = buttonContainer else { return }
+        container.isHidden = false
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.1
+            container.animator().alphaValue = 1
+        }
+    }
+
     private func updateRecognizeButton() {
-        guard let btn = recognizeButton, let plainBtn = recognizePlainButton else { return }
+        guard let btn = recognizeButton, let plainBtn = recognizePlainButton,
+              let container = buttonContainer else { return }
+        if isInteracting {
+            hideButtons()
+            return
+        }
         if selectionRect.width > 20 && selectionRect.height > 20 {
-            let btnSize = btn.fittingSize
-            let plainSize = plainBtn.fittingSize
+            let hPad: CGFloat = 10
+            let vPad: CGFloat = 4
+            let btnSize = CGSize(width: btn.fittingSize.width + hPad * 2,
+                                 height: btn.fittingSize.height + vPad * 2)
+            let plainSize = CGSize(width: plainBtn.fittingSize.width + hPad * 2,
+                                   height: plainBtn.fittingSize.height + vPad * 2)
             let gap: CGFloat = 6
             let totalWidth = btnSize.width + gap + plainSize.width
-            let bottomY = selectionRect.minY - btnSize.height - 4
+            let btnHeight = max(btnSize.height, plainSize.height)
+            let margin: CGFloat = 4
 
-            // Right-align the pair to the right edge of the selection
+            // Right-aligned to selection right edge
             let rightEdge = selectionRect.maxX
-            btn.frame = CGRect(
-                x: rightEdge - totalWidth,
-                y: bottomY,
-                width: btnSize.width,
-                height: btnSize.height
-            )
-            plainBtn.frame = CGRect(
-                x: rightEdge - plainSize.width,
-                y: bottomY,
-                width: plainSize.width,
-                height: plainSize.height
-            )
-            btn.isHidden = false
-            plainBtn.isHidden = false
+            let leftX = rightEdge - totalWidth
 
-            // Update tracking area for custom tooltip
+            // Prefer outside bottom-right; if no room, place inside bottom-right
+            let outsideY = selectionRect.minY - btnHeight - margin
+            let baseY: CGFloat
+            if outsideY >= bounds.minY {
+                baseY = outsideY
+            } else {
+                baseY = selectionRect.minY + margin
+            }
+
+            container.frame = CGRect(
+                x: leftX,
+                y: baseY,
+                width: totalWidth,
+                height: btnHeight
+            )
+            btn.frame = CGRect(x: 0, y: 0, width: btnSize.width, height: btnHeight)
+            plainBtn.frame = CGRect(x: btnSize.width + gap, y: 0,
+                                    width: plainSize.width, height: btnHeight)
+
+            showButtons()
+
+            // Update tracking area for custom tooltip (in superview coords)
             if let old = tooltipTrackingArea { removeTrackingArea(old) }
+            let plainFrameInSelf = CGRect(
+                x: container.frame.origin.x + plainBtn.frame.origin.x,
+                y: container.frame.origin.y + plainBtn.frame.origin.y,
+                width: plainBtn.frame.width,
+                height: plainBtn.frame.height
+            )
             let ta = NSTrackingArea(
-                rect: plainBtn.frame,
+                rect: plainFrameInSelf,
                 options: [.mouseEnteredAndExited, .activeAlways],
                 owner: self,
                 userInfo: nil
@@ -386,20 +460,21 @@ class SelectionView: NSView {
             addTrackingArea(ta)
             tooltipTrackingArea = ta
         } else {
-            btn.isHidden = true
-            plainBtn.isHidden = true
+            hideButtons()
             tooltipLabel?.isHidden = true
             if let old = tooltipTrackingArea { removeTrackingArea(old); tooltipTrackingArea = nil }
         }
     }
 
     override func mouseEntered(with event: NSEvent) {
-        guard let plainBtn = recognizePlainButton, let label = tooltipLabel else { return }
+        guard let plainBtn = recognizePlainButton, let label = tooltipLabel,
+              let container = buttonContainer else { return }
         label.sizeToFit()
         var f = label.frame
         f.size.width += 8
-        // Position above the Plain Text button
-        f.origin = CGPoint(x: plainBtn.frame.minX, y: plainBtn.frame.maxY + 4)
+        // Convert plainBtn frame from container coords to self coords
+        let plainInSelf = container.convert(plainBtn.frame, to: self)
+        f.origin = CGPoint(x: plainInSelf.minX, y: plainInSelf.maxY + 4)
         // Keep within view bounds
         if f.maxX > bounds.maxX { f.origin.x = bounds.maxX - f.width }
         label.frame = f

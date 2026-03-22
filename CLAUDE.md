@@ -24,4 +24,4 @@ DO NOT use emoji. Again, DO NOT use emoji.
 
 DO NOT come to conclusion. Analyze and present you analysis.
 
-To test build this app, run `bash scripts/build_release.sh`
+To test build this app, run `bash scripts/build_release.sh`. It contain embedding logic that simple `xcoderun` cannot resolve.
