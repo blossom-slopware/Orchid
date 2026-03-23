@@ -17,6 +17,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        AppLogger.shared.bootstrap()
+        AppLogger.shared.info("application did finish launching", category: "lifecycle")
 
         // Load config (auto-creates ~/.orchid/config.toml if absent)
         config = OrchidConfig.load()
@@ -130,6 +132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        AppLogger.shared.info("application will terminate", category: "lifecycle")
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
         }
@@ -256,7 +259,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             &hotKeyRef
         )
         if status != noErr {
-            print("Orchid: failed to register F4 hotkey, status=\(status)")
+            AppLogger.shared.error("failed to register F4 hotkey, status=\(status)", category: "hotkey")
             return
         }
 

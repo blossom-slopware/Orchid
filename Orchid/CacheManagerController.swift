@@ -46,12 +46,15 @@ final class CacheManagerController: @unchecked Sendable {
                     try fm.removeItem(at: file)
                     deletedCount += 1
                 } catch {
-                    print("Orchid: failed to delete \(file.lastPathComponent): \(error)")
+                    AppLogger.shared.error(
+                        "failed to delete cached image \(file.lastPathComponent): \(error)",
+                        category: "cache"
+                    )
                     errorOccurred = true
                 }
             }
         } catch {
-            print("Orchid: cache dir not found or unreadable: \(error)")
+            AppLogger.shared.error("cache dir not found or unreadable: \(error)", category: "cache")
         }
 
         // MARK: Step 3 — Update the same confirm alert in-place

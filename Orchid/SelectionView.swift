@@ -586,7 +586,7 @@ class SelectionView: NSView {
         }
 
         guard let image else {
-            print("Orchid: screen capture failed")
+            AppLogger.shared.error("screen capture failed", category: "capture")
             return
         }
 
@@ -597,7 +597,7 @@ class SelectionView: NSView {
             try FileManager.default.createDirectory(
                 at: storageDir, withIntermediateDirectories: true)
         } catch {
-            print("Orchid: failed to create storage dir: \(error)")
+            AppLogger.shared.error("failed to create storage dir: \(error)", category: "capture")
             return
         }
 
@@ -608,11 +608,11 @@ class SelectionView: NSView {
         let fileURL = storageDir.appendingPathComponent("\(timestamp).png")
 
         guard ScreenCapture.save(image: image, to: fileURL) else {
-            print("Orchid: failed to save PNG")
+            AppLogger.shared.error("failed to save PNG", category: "capture")
             return
         }
 
-        print("Orchid: saved capture to \(fileURL.path)")
+        AppLogger.shared.info("saved capture to \(fileURL.path)", category: "capture")
 
         DispatchQueue.main.async {
             ResultPanelController.shared.show(imageURL: fileURL, mode: mode)

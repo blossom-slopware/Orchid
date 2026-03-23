@@ -25,7 +25,7 @@ final class ServerManager: ObservableObject, @unchecked Sendable {
 
     func start(model: String, config: OrchidConfig) {
         guard let modelPath = config.modelPath(for: model) else {
-            print("ServerManager: unknown model key '\(model)'")
+            AppLogger.shared.error("unknown model key '\(model)'", category: "server")
             return
         }
 
