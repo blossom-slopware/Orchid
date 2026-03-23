@@ -55,6 +55,8 @@ echo "    Metallib: $RUST_TARGET_DIR/mlx.metallib ($(du -sh "$RUST_TARGET_DIR/ml
 # ---------------------------------------------------------------------------
 BUILD_DIR="$REPO_ROOT/build"
 APP_BUILD_DIR="$BUILD_DIR/Release"
+echo "--> Removing old build artifacts"
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 echo "--> xcodebuild"

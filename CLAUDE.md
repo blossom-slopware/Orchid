@@ -31,3 +31,16 @@ When you are planning, your plan MUST NOT contain overly detailed code changes.
 DO NOT ask me meaningless questions. If the answer of a question can be found in code, **find it by yourself**.
 
 若非GUI功能，禁止谁用ascii art
+
+使用swift-huggingface库进行下载：
+本地源码在 /Users/daisy/develop/GLM-OCR/swift-huggingface
+但是导入的时候使用
+dependencies: [
+    .package(
+        url: "https://github.com/huggingface/swift-huggingface.git",
+        from: "0.9.0",
+        traits: ["Xet"]
+    )
+]
+本地的源代码只是给你参考的，你应当参考库的源代码
+，readme等。
