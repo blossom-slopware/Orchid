@@ -72,6 +72,13 @@ if [[ ! -d "$APP_PATH" ]]; then
     exit 1
 fi
 
+# Rename to Orchid(debug).app for local builds
+FINAL_APP_NAME="Orchid(debug).app"
+FINAL_APP_PATH="$APP_BUILD_DIR/$FINAL_APP_NAME"
+mv "$APP_PATH" "$FINAL_APP_PATH"
+APP_PATH="$FINAL_APP_PATH"
+echo "    Renamed to $FINAL_APP_NAME"
+
 # ---------------------------------------------------------------------------
 # 3. Embed glm-ocr-server and mlx.metallib into the app bundle
 # ---------------------------------------------------------------------------
@@ -94,7 +101,7 @@ codesign --deep --force --sign "-" "$APP_PATH"
 ZIP_NAME="Orchid-${VERSION}.zip"
 ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
 echo "--> Creating $ZIP_NAME"
-(cd "$APP_BUILD_DIR" && zip -qr "$ZIP_PATH" Orchid.app)
+(cd "$APP_BUILD_DIR" && zip -qr "$ZIP_PATH" "$FINAL_APP_NAME")
 
 echo "--> SHA256"
 SHA256="$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')"
