@@ -77,18 +77,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if ModelValidator.isModelDirectoryReady(at: modelDir) {
-            CGRequestScreenCaptureAccess()
             ServerManager.shared.start(model: config.defaultModel, config: config)
+            requestScreenCapturePermissionAtStartupIfNeeded()
         } else {
             let dlWC = ModelDownloadWindowController()
             downloadWindowController = dlWC
             dlWC.onDownloadComplete = { [weak self] in
                 guard let self else { return }
                 self.downloadWindowController = nil
-                CGRequestScreenCaptureAccess()
                 ServerManager.shared.start(model: self.config.defaultModel, config: self.config)
+                self.requestScreenCapturePermissionAtStartupIfNeeded()
             }
             dlWC.presentAndStartDownload(modelDir: modelDir)
+        }
+    }
+
+    private func requestScreenCapturePermissionAtStartupIfNeeded() {
+        guard !CGPreflightScreenCaptureAccess() else { return }
+        _ = CGRequestScreenCaptureAccess()
+    }
+
+    private func showScreenCaptureSettingsAlert() {
+        let alert = NSAlert()
+        alert.messageText = "需要屏幕录制权限"
+        alert.informativeText = "请前往：系统设置 → 隐私与安全性 → 屏幕录制，勾选 Orchid 后重新启动应用。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "打开系统设置")
+        alert.addButton(withTitle: "稍后")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.open(
+                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
+            )
         }
     }
 
@@ -186,22 +206,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showOverlay() {
         if !CGPreflightScreenCaptureAccess() {
-            CGRequestScreenCaptureAccess()
-            // If still denied after requesting, system won't prompt again — guide user to Settings.
-            if !CGPreflightScreenCaptureAccess() {
-                let alert = NSAlert()
-                alert.messageText = "需要屏幕录制权限"
-                alert.informativeText = "请前往：系统设置 → 隐私与安全性 → 屏幕录制，勾选 Orchid 后重新启动应用。"
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: "打开系统设置")
-                alert.addButton(withTitle: "稍后")
-                NSApp.activate(ignoringOtherApps: true)
-                if alert.runModal() == .alertFirstButtonReturn {
-                    NSWorkspace.shared.open(
-                        URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-                    )
-                }
-            }
+            showScreenCaptureSettingsAlert()
             return
         }
 

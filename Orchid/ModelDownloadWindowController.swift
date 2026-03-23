@@ -26,6 +26,12 @@ final class ModelDownloadWindowController: NSWindowController {
     private let cancelButton   = NSButton(title: "取消", target: nil, action: nil)
     private let doneButton     = NSButton(title: "开始使用", target: nil, action: nil)
 
+    private var logScrollView: NSScrollView!
+    private var logTextView: NSTextView!
+
+    /// 防止日志文本无限增长拖慢 UI。
+    private static let logTextViewMaxUTF16Length = 50_000
+
     // MARK: - Downloader
 
     private var downloader: HFModelDownloader?
@@ -34,7 +40,7 @@ final class ModelDownloadWindowController: NSWindowController {
 
     convenience init() {
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 220),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -57,25 +63,22 @@ final class ModelDownloadWindowController: NSWindowController {
 
         state = .downloading
 
-        let repoId = "mlx-community/GLM-OCR-bf16"
+        logTextView.textStorage?.setAttributedString(NSAttributedString(string: ""))
+
+        let repoId = GLMOCRRepositoryFileList.repoId
         let dl = HFModelDownloader(repoId: repoId, finalModelDir: modelDir)
         downloader = dl
 
-        dl.onProgress = { @MainActor [weak self] progress in
+        dl.onLogLine = { @MainActor [weak self] line in
+            self?.appendLogLineForDisplay(line)
+        }
+
+        dl.onProgress = { @MainActor [weak self] _ in
             guard let self else { return }
-            self.fileLabel.stringValue = "正在下载 GLM-OCR 模型..."
-            if progress.totalUnitCount > 0 {
-                let fraction = progress.fractionCompleted
-                self.progressBar.isIndeterminate = false
-                self.progressBar.doubleValue = fraction * 100
-                let downloadedMB = Double(progress.completedUnitCount) / 1_048_576
-                let totalMB = Double(progress.totalUnitCount) / 1_048_576
-                self.speedLabel.stringValue = String(format: "%.0f / %.0f MB", downloadedMB, totalMB)
-            } else {
-                self.progressBar.isIndeterminate = true
-                self.progressBar.startAnimation(nil)
-                self.speedLabel.stringValue = ""
-            }
+            self.fileLabel.stringValue = "正在下载 GLM-OCR 模型…"
+            self.progressBar.isIndeterminate = true
+            self.progressBar.startAnimation(nil)
+            self.speedLabel.stringValue = ""
         }
 
         dl.onComplete = { [weak self] error in
@@ -119,6 +122,39 @@ final class ModelDownloadWindowController: NSWindowController {
         speedLabel.textColor = .secondaryLabelColor
         speedLabel.alignment = .right
 
+        let logCaption = NSTextField(labelWithString: "详细日志（与 ~/.orchid/logs/download.log 同步）")
+        logCaption.textColor = .secondaryLabelColor
+        logCaption.font = NSFont.systemFont(ofSize: 11)
+        logCaption.translatesAutoresizingMaskIntoConstraints = false
+
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .bezelBorder
+        scroll.drawsBackground = true
+
+        let tv = NSTextView()
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.isRichText = false
+        tv.importsGraphics = false
+        tv.drawsBackground = true
+        tv.backgroundColor = .textBackgroundColor
+        tv.font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
+        tv.textContainerInset = NSSize(width: 6, height: 6)
+        tv.minSize = NSSize(width: 0, height: 80)
+        tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.textContainer?.widthTracksTextView = true
+        tv.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+
+        scroll.documentView = tv
+        logScrollView = scroll
+        logTextView = tv
+
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.target = self
         cancelButton.action = #selector(cancelTapped)
@@ -134,7 +170,7 @@ final class ModelDownloadWindowController: NSWindowController {
         buttonStack.spacing = 8
         buttonStack.translatesAutoresizingMaskIntoConstraints = false
 
-        for view in [titleLabel, descLabel, fileLabel, progressBar, speedLabel, buttonStack] {
+        for view in [titleLabel, descLabel, fileLabel, progressBar, speedLabel, logCaption, scroll, buttonStack] {
             contentView.addSubview(view)
         }
 
@@ -158,10 +194,36 @@ final class ModelDownloadWindowController: NSWindowController {
             speedLabel.topAnchor.constraint(equalTo: progressBar.bottomAnchor, constant: 4),
             speedLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
 
-            buttonStack.topAnchor.constraint(equalTo: speedLabel.bottomAnchor, constant: 16),
+            logCaption.topAnchor.constraint(equalTo: speedLabel.bottomAnchor, constant: 12),
+            logCaption.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            logCaption.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+
+            scroll.topAnchor.constraint(equalTo: logCaption.bottomAnchor, constant: 4),
+            scroll.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
+            scroll.heightAnchor.constraint(equalToConstant: 160),
+
+            buttonStack.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 12),
             buttonStack.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
-            buttonStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
+            buttonStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
         ])
+    }
+
+    private func appendLogLineForDisplay(_ line: String) {
+        guard let storage = logTextView.textStorage else { return }
+        let attr: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular),
+            .foregroundColor: NSColor.textColor,
+        ]
+        let piece = line.hasSuffix("\n") ? line : (line + "\n")
+        storage.append(NSAttributedString(string: piece, attributes: attr))
+
+        let maxLen = Self.logTextViewMaxUTF16Length
+        if storage.length > maxLen {
+            storage.deleteCharacters(in: NSRange(location: 0, length: storage.length - maxLen))
+        }
+
+        logTextView.scrollToEndOfDocument(nil)
     }
 
     // MARK: - Update UI from state
@@ -177,6 +239,7 @@ final class ModelDownloadWindowController: NSWindowController {
             cancelButton.isEnabled = true
 
         case .downloading:
+            progressBar.isIndeterminate = true
             progressBar.startAnimation(nil)
             doneButton.isEnabled = false
             cancelButton.isEnabled = true

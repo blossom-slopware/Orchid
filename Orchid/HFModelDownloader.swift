@@ -5,11 +5,23 @@ import HuggingFace
 /// directory, using a local HF cache under `~/.orchid` for resume support.
 final class HFModelDownloader: @unchecked Sendable {
 
+    /// 默认 Hub 为 https://hf-mirror.com；可通过环境变量 HF_ENDPOINT 覆盖（与 swift-huggingface 约定一致）。
+    private static func hubHostURL() -> URL {
+        if let endpoint = ProcessInfo.processInfo.environment["HF_ENDPOINT"],
+           let url = URL(string: endpoint)
+        {
+            return url
+        }
+        return URL(string: "https://hf-mirror.com")!
+    }
+
     let repoId: String
     let finalModelDir: URL
 
     var onProgress: (@MainActor @Sendable (Progress) -> Void)?
     var onComplete: (@MainActor (Error?) -> Void)?
+    /// 与写入 `~/.orchid/logs/download.log` 的每一行相同（含时间戳），供 UI 实时展示。
+    var onLogLine: (@MainActor @Sendable (String) -> Void)?
 
     private var downloadTask: Task<Void, Never>?
     private var logHandle: FileHandle?
@@ -69,16 +81,24 @@ final class HFModelDownloader: @unchecked Sendable {
         log("final_dir=\(finalModelDir.path)")
         log("cache_dir=\(cacheDir.path)")
 
+        let hubHost = Self.hubHostURL()
+        log("hub_host=\(hubHost.absoluteString)")
+
         try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
 
         let cache = HubCache(location: .fixed(directory: cacheDir))
-        let client = HubClient(cache: cache)
+        let client = HubClient(
+            session: URLSession(configuration: .default),
+            host: hubHost,
+            cache: cache
+        )
 
         guard let repoID = Repo.ID(rawValue: repoId) else {
             log("invalid repo id: \(repoId)")
             throw DownloadError.validationFailed
         }
 
+        log("await downloadSnapshot start revision=main")
         _ = try await client.downloadSnapshot(
             of: repoID,
             kind: .model,
@@ -93,6 +113,7 @@ final class HFModelDownloader: @unchecked Sendable {
                 }
             }
         )
+        log("await downloadSnapshot finished")
 
         try Task.checkCancellation()
 
@@ -170,11 +191,16 @@ final class HFModelDownloader: @unchecked Sendable {
     }
 
     private func log(_ message: String) {
-        guard let logHandle else { return }
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let line = "[\(timestamp)] \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
-        try? logHandle.write(contentsOf: data)
+        if let logHandle, let data = line.data(using: .utf8) {
+            try? logHandle.write(contentsOf: data)
+        }
+        if let onLogLine {
+            Task { @MainActor in
+                onLogLine(line)
+            }
+        }
     }
 
     enum DownloadError: LocalizedError {
