@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Preflight – verify secrets and permissions
+      - name: Preflight - verify secrets and permissions
         env:
           HOMEBREW_REPO_TOKEN: ${{ secrets.HOMEBREW_REPO_TOKEN }}
         run: |
@@ -59,43 +59,17 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Get ocr-inference commit hash
-        id: ocr_commit
-        run: echo "hash=$(git rev-parse HEAD:ocr-inference)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache glm-ocr-server binary and metallib
-        id: cache_binary
-        uses: actions/cache@v4
-        with:
-          path: |
-            ocr-inference/target/release/glm-ocr-server
-            ocr-inference/target/release/mlx.metallib
-          key: glm-ocr-server-${{ steps.ocr_commit.outputs.hash }}
-
       - name: Install Rust toolchain
-        if: steps.cache_binary.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
 
-      - name: Cache Cargo registry
-        if: steps.cache_binary.outputs.cache-hit != 'true'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-${{ hashFiles('ocr-inference/Cargo.lock') }}
-          restore-keys: cargo-
-
       - name: Build glm-ocr-server (release)
-        if: steps.cache_binary.outputs.cache-hit != 'true'
         run: |
           cargo build --release \
             --manifest-path ocr-inference/Cargo.toml \
             -p glm-ocr-server
 
-          # Copy metallib to a stable path for caching
           METALLIB=$(find ocr-inference/target/release/build -name "mlx.metallib" -type f | head -1)
           cp "$METALLIB" ocr-inference/target/release/mlx.metallib
         env:
