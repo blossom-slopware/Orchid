@@ -29,3 +29,5 @@ To test build this app, run `bash scripts/build_release.sh`. It contain embeddin
 When you are planning, your plan MUST NOT contain overly detailed code changes.
 
 DO NOT ask me meaningless questions. If the answer of a question can be found in code, **find it by yourself**.
+
+若非GUI功能，禁止谁用ascii art

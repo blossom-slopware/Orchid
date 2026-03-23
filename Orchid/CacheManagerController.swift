@@ -1,7 +1,7 @@
 import AppKit
 
-final class CacheManagerController {
-    static let shared = CacheManagerController()
+final class CacheManagerController: @unchecked Sendable {
+    nonisolated(unsafe) static let shared = CacheManagerController()
     private init() {}
 
     private let storageDir = FileManager.default.homeDirectoryForCurrentUser

@@ -2,6 +2,7 @@ import AppKit
 import Carbon
 import Combine
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var overlayWindowController: OverlayWindowController?
@@ -70,21 +71,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ?? (FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".orchid/models/GLM-OCR-bf16").path)
         let modelDir = URL(fileURLWithPath: modelPath)
-        let weightsFile = modelDir.appendingPathComponent("model.safetensors")
-
-        var needsDownload = true
-        if FileManager.default.fileExists(atPath: weightsFile.path),
-           let attrs = try? FileManager.default.attributesOfItem(atPath: weightsFile.path),
-           let size = attrs[.size] as? Int64,
-           size > 100_000_000 {
-            needsDownload = false
-        }
 
         ServerManager.shared.onStartupError = { [weak self] log in
             self?.showServerErrorAlert(log: log)
         }
 
-        if needsDownload {
+        if ModelValidator.isModelDirectoryReady(at: modelDir) {
+            CGRequestScreenCaptureAccess()
+            ServerManager.shared.start(model: config.defaultModel, config: config)
+        } else {
             let dlWC = ModelDownloadWindowController()
             downloadWindowController = dlWC
             dlWC.onDownloadComplete = { [weak self] in
@@ -94,9 +89,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 ServerManager.shared.start(model: self.config.defaultModel, config: self.config)
             }
             dlWC.presentAndStartDownload(modelDir: modelDir)
-        } else {
-            CGRequestScreenCaptureAccess()
-            ServerManager.shared.start(model: config.defaultModel, config: config)
         }
     }
 

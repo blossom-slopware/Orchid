@@ -417,8 +417,8 @@ private final class ResultPanel: NSPanel {
 }
 
 // MARK: - Panel Controller
-final class ResultPanelController: NSObject {
-    static let shared = ResultPanelController()
+final class ResultPanelController: NSObject, @unchecked Sendable {
+    nonisolated(unsafe) static let shared = ResultPanelController()
 
     private var panel: ResultPanel?
     private var ocrState = OCRState()

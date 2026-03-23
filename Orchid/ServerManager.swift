@@ -2,8 +2,8 @@ import Foundation
 import Darwin
 import Combine
 
-final class ServerManager: ObservableObject {
-    static let shared = ServerManager()
+final class ServerManager: ObservableObject, @unchecked Sendable {
+    nonisolated(unsafe) static let shared = ServerManager()
 
     enum State { case stopped, starting, running, stopping }
 

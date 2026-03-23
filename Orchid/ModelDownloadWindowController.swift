@@ -28,7 +28,7 @@ final class ModelDownloadWindowController: NSWindowController {
 
     // MARK: - Downloader
 
-    private var downloader: HuggingFaceDownloader?
+    private var downloader: HFModelDownloader?
 
     // MARK: - Init
 
@@ -58,33 +58,23 @@ final class ModelDownloadWindowController: NSWindowController {
         state = .downloading
 
         let repoId = "mlx-community/GLM-OCR-bf16"
-        let dl = HuggingFaceDownloader(repoId: repoId, localDir: modelDir)
+        let dl = HFModelDownloader(repoId: repoId, finalModelDir: modelDir)
         downloader = dl
 
-        dl.onProgress = { [weak self] file, fileIndex, fileCount, bytesReceived, bytesExpected, bps in
+        dl.onProgress = { @MainActor [weak self] progress in
             guard let self else { return }
-            let fileName = (file as NSString).lastPathComponent
-            let fileInfo = "正在下载：\(fileName) (\(fileIndex + 1)/\(fileCount))"
-            let speedInfo: String
-            if bps > 0 {
-                speedInfo = String(format: "%.1f MB/s", bps / 1_048_576)
-            } else {
-                speedInfo = ""
-            }
-            let progress: Double
-            if bytesExpected > 0 {
-                progress = Double(bytesReceived) / Double(bytesExpected)
-            } else {
-                progress = -1
-            }
-            self.fileLabel.stringValue = fileInfo
-            self.speedLabel.stringValue = speedInfo
-            if progress >= 0 {
+            self.fileLabel.stringValue = "正在下载 GLM-OCR 模型..."
+            if progress.totalUnitCount > 0 {
+                let fraction = progress.fractionCompleted
                 self.progressBar.isIndeterminate = false
-                self.progressBar.doubleValue = progress * 100
+                self.progressBar.doubleValue = fraction * 100
+                let downloadedMB = Double(progress.completedUnitCount) / 1_048_576
+                let totalMB = Double(progress.totalUnitCount) / 1_048_576
+                self.speedLabel.stringValue = String(format: "%.0f / %.0f MB", downloadedMB, totalMB)
             } else {
                 self.progressBar.isIndeterminate = true
                 self.progressBar.startAnimation(nil)
+                self.speedLabel.stringValue = ""
             }
         }
 

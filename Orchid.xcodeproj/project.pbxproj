@@ -18,9 +18,11 @@
 		AA000001000000000000011 /* OrchidIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000011 /* OrchidIcon.swift */; };
 		AA000001000000000000012 /* OrchidConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000012 /* OrchidConfig.swift */; };
 		AA000001000000000000013 /* ServerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000013 /* ServerManager.swift */; };
-		AA000001000000000000020 /* HuggingFaceDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000020 /* HuggingFaceDownloader.swift */; };
+		AA000001000000000000020 /* HFModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000020 /* HFModelDownloader.swift */; };
 		AA000001000000000000021 /* ModelDownloadWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000021 /* ModelDownloadWindowController.swift */; };
+		AA000001000000000000022 /* ModelValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000022 /* ModelValidator.swift */; };
 		AA000001000000000000014 /* TOMLKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000012000000000000001 /* TOMLKit */; };
+		AA000001000000000000030 /* HuggingFaceWrapper in Frameworks */ = {isa = PBXBuildFile; productRef = AA000012000000000000002 /* HuggingFaceWrapper */; };
 		AA000001000000000000015 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000015 /* Assets.xcassets */; };
 		AA000001000000000000016 /* AppIcon.icns in Resources */ = {isa = PBXBuildFile; fileRef = AA000002000000000000016 /* AppIcon.icns */; };
 /* End PBXBuildFile section */
@@ -39,8 +41,9 @@
 		AA000002000000000000011 /* OrchidIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrchidIcon.swift; sourceTree = "<group>"; };
 		AA000002000000000000012 /* OrchidConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrchidConfig.swift; sourceTree = "<group>"; };
 		AA000002000000000000013 /* ServerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerManager.swift; sourceTree = "<group>"; };
-		AA000002000000000000020 /* HuggingFaceDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HuggingFaceDownloader.swift; sourceTree = "<group>"; };
+		AA000002000000000000020 /* HFModelDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HFModelDownloader.swift; sourceTree = "<group>"; };
 		AA000002000000000000021 /* ModelDownloadWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadWindowController.swift; sourceTree = "<group>"; };
+		AA000002000000000000022 /* ModelValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelValidator.swift; sourceTree = "<group>"; };
 		AA000002000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA000002000000000000016 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		AA000003000000000000001 /* Orchid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orchid.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -52,6 +55,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA000001000000000000014 /* TOMLKit in Frameworks */,
+				AA000001000000000000030 /* HuggingFaceWrapper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -74,8 +78,9 @@
 				AA000002000000000000011 /* OrchidIcon.swift */,
 				AA000002000000000000012 /* OrchidConfig.swift */,
 				AA000002000000000000013 /* ServerManager.swift */,
-				AA000002000000000000020 /* HuggingFaceDownloader.swift */,
+				AA000002000000000000020 /* HFModelDownloader.swift */,
 				AA000002000000000000021 /* ModelDownloadWindowController.swift */,
+				AA000002000000000000022 /* ModelValidator.swift */,
 				AA000002000000000000015 /* Assets.xcassets */,
 				AA000002000000000000016 /* AppIcon.icns */,
 			);
@@ -116,6 +121,7 @@
 			name = Orchid;
 			packageProductDependencies = (
 				AA000012000000000000001 /* TOMLKit */,
+				AA000012000000000000002 /* HuggingFaceWrapper */,
 			);
 			productName = Orchid;
 			productReference = AA000003000000000000001 /* Orchid.app */;
@@ -147,6 +153,7 @@
 			mainGroup = AA000005000000000000003;
 			packageReferences = (
 				AA000013000000000000001 /* XCRemoteSwiftPackageReference "TOMLKit" */,
+				AA000013000000000000002 /* XCLocalSwiftPackageReference "HuggingFaceWrapper" */,
 			);
 			productRefGroup = AA000005000000000000002 /* Products */;
 			projectDirPath = "";
@@ -185,8 +192,9 @@
 				AA000001000000000000011 /* OrchidIcon.swift in Sources */,
 				AA000001000000000000012 /* OrchidConfig.swift in Sources */,
 				AA000001000000000000013 /* ServerManager.swift in Sources */,
-				AA000001000000000000020 /* HuggingFaceDownloader.swift in Sources */,
+				AA000001000000000000020 /* HFModelDownloader.swift in Sources */,
 				AA000001000000000000021 /* ModelDownloadWindowController.swift in Sources */,
+				AA000001000000000000022 /* ModelValidator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,11 +212,23 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		AA000013000000000000002 /* XCLocalSwiftPackageReference "HuggingFaceWrapper" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/HuggingFaceWrapper;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		AA000012000000000000001 /* TOMLKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AA000013000000000000001 /* XCRemoteSwiftPackageReference "TOMLKit" */;
 			productName = TOMLKit;
+		};
+		AA000012000000000000002 /* HuggingFaceWrapper */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA000013000000000000002 /* XCLocalSwiftPackageReference "HuggingFaceWrapper" */;
+			productName = HuggingFaceWrapper;
 		};
 /* End XCSwiftPackageProductDependency section */
 
@@ -350,7 +370,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.orchid.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -376,7 +396,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.orchid.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
