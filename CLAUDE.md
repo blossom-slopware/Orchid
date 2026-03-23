@@ -27,3 +27,5 @@ DO NOT come to conclusion. Analyze and present you analysis.
 To test build this app, run `bash scripts/build_release.sh`. It contain embedding logic that simple `xcoderun` cannot resolve.
 
 When you are planning, your plan MUST NOT contain overly detailed code changes.
+
+DO NOT ask me meaningless questions. If the answer of a question can be found in code, **find it by yourself**.
