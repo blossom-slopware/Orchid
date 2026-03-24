@@ -33,6 +33,10 @@ brew upgrade --cask blossom-slopware/orchid/orchid
 - This app is **not** small. It automatically downloads a GLM-OCR checkpoint from huggingface (hf-mirror in China Mainland) at initial startup, which takes ~15 minutes and takes up ~2G disk space.
 - After this initial download, it runs OCR inference on your own computer. Therefore, it is **completely** offline, but takes up a good chunk of memory.
 
+### Use
+
+`F4` to select a screen region to recognize.
+
 ### Manual Installation
 
 Download the latest release from [GitHub Releases](https://github.com/GLM-OCR/orchid/releases) and extract `Orchid.app` to your Applications folder.
